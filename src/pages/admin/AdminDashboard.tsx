@@ -229,7 +229,20 @@ export const AdminDashboard: React.FC = () => {
             ) : (
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                 {upcomingDeadlines.map((task) => {
-                  const assignee = users.find((u) => u.uid === task.assignedTo);
+                  const assigneeUids = Array.isArray(task.assignedTo)
+                    ? task.assignedTo
+                    : task.assignedTo
+                    ? [task.assignedTo]
+                    : [];
+                  const assignedUsers = assigneeUids
+                    .map((uid) => users.find((u) => u.uid === uid))
+                    .filter(Boolean);
+                  const assigneeText =
+                    assignedUsers.length === 0
+                      ? 'Unassigned'
+                      : assignedUsers.length === 1
+                      ? assignedUsers[0]?.name
+                      : `${assignedUsers[0]?.name} +${assignedUsers.length - 1}`;
                   return (
                     <div
                       key={task.id}
@@ -244,7 +257,7 @@ export const AdminDashboard: React.FC = () => {
                         </Link>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                            Assigned to <strong>{assignee?.name || 'Unassigned'}</strong>
+                            Assigned to <strong>{assigneeText}</strong>
                           </span>
                           {task.team && (
                             <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">

@@ -4,8 +4,6 @@ import {
   updateDoc,
   query,
   where,
-  orderBy,
-  limit,
   onSnapshot,
   serverTimestamp,
   getDocs,
@@ -43,7 +41,7 @@ export async function createNotification(
 }
 
 /**
- * Subscribes to real-time notifications for the active user
+ * Subscribes to real-time notifications for the active user (client-side sorted to avoid requiring composite indexes)
  */
 export function subscribeUserNotifications(
   userId: string,
@@ -54,9 +52,7 @@ export function subscribeUserNotifications(
 
   const q = query(
     notificationsCol,
-    where('userId', '==', userId),
-    orderBy('createdAt', 'desc'),
-    limit(maxItems)
+    where('userId', '==', userId)
   );
 
   return onSnapshot(
@@ -66,7 +62,15 @@ export function subscribeUserNotifications(
         id: d.id,
         ...(d.data() as Omit<AppNotification, 'id'>),
       }));
-      callback(items);
+
+      // Sort client-side by createdAt descending
+      items.sort((a, b) => {
+        const aTime = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : new Date(a.createdAt || 0).getTime();
+        const bTime = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : new Date(b.createdAt || 0).getTime();
+        return bTime - aTime;
+      });
+
+      callback(items.slice(0, maxItems));
     },
     (err) => {
       console.error('Error subscribing to notifications:', err);

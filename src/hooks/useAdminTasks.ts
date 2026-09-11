@@ -58,7 +58,10 @@ export function useAdminTasks(initialFilters?: AdminTaskFilterOptions) {
 
       // Assigned User
       if (filters.assignedTo && filters.assignedTo !== 'all') {
-        if (task.assignedTo !== filters.assignedTo) return false;
+        const hasUser = Array.isArray(task.assignedTo)
+          ? task.assignedTo.includes(filters.assignedTo)
+          : task.assignedTo === filters.assignedTo;
+        if (!hasUser) return false;
       }
 
       // Status

@@ -3,6 +3,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   getDocs,
   query,
   onSnapshot,
@@ -104,7 +105,7 @@ export async function updateUserRole(uid: string, newRole: SystemRole): Promise<
 }
 
 /**
- * Admin action: Update user's active status
+ * Admin action: Update user's active status (block / unblock)
  */
 export async function toggleUserActiveStatus(uid: string, isActive: boolean): Promise<void> {
   const userRef = doc(db, 'users', uid);
@@ -112,6 +113,14 @@ export async function toggleUserActiveStatus(uid: string, isActive: boolean): Pr
     isActive,
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Admin action: Delete user profile document from Firestore
+ */
+export async function deleteUserProfileDoc(uid: string): Promise<void> {
+  const userRef = doc(db, 'users', uid);
+  await deleteDoc(userRef);
 }
 
 /**

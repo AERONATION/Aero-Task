@@ -249,7 +249,7 @@ export const AdminTasks: React.FC = () => {
               <TaskCard
                 key={task.id}
                 task={task}
-                assignedUser={usersMap.get(task.assignedTo)}
+                usersMap={usersMap}
                 onStatusChange={handleStatusChange}
                 onEdit={(t) => {
                   setActiveTask(t);

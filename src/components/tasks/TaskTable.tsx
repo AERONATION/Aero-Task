@@ -12,14 +12,16 @@ import {
   Trash2,
   ExternalLink,
   User as UserIcon,
+  Code2,
 } from 'lucide-react';
 
 interface TaskTableProps {
   tasks: Task[];
   usersMap?: Map<string, UserProfile>;
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
-  onEdit: (task: Task) => void;
-  onDelete: (task: Task) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
+  canEditTask?: (task: Task) => boolean;
   detailUrlPrefix?: string;
   showAssignee?: boolean;
 }
@@ -30,26 +32,40 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onStatusChange,
   onEdit,
   onDelete,
+  canEditTask,
   detailUrlPrefix = '/user/tasks',
   showAssignee = true,
 }) => {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-xs">
+    <div className="w-full overflow-x-auto rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 shadow-xs text-left">
       <table className="w-full text-left text-sm">
         <thead className="bg-zinc-50/80 dark:bg-zinc-800/40 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
           <tr>
             <th className="py-3 px-4 min-w-[240px]">Task</th>
-            {showAssignee && <th className="py-3 px-4 min-w-[140px]">Assigned To</th>}
-            <th className="py-3 px-4 min-w-[130px]">Team</th>
+            {showAssignee && <th className="py-3 px-4 min-w-[160px]">Assigned To</th>}
+            <th className="py-3 px-4 min-w-[120px]">Checklist</th>
+            <th className="py-3 px-4 min-w-[110px]">Team</th>
             <th className="py-3 px-4 min-w-[100px]">Priority</th>
             <th className="py-3 px-4 min-w-[130px]">Status</th>
-            <th className="py-3 px-4 min-w-[150px]">Deadline</th>
-            <th className="py-3 px-4 text-right min-w-[120px]">Actions</th>
+            <th className="py-3 px-4 min-w-[140px]">Deadline</th>
+            <th className="py-3 px-4 text-right min-w-[110px]">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
           {tasks.map((task) => {
-            const assignee = usersMap.get(task.assignedTo);
+            const assigneeUids: string[] = Array.isArray(task.assignedTo)
+              ? task.assignedTo
+              : task.assignedTo
+              ? [task.assignedTo]
+              : [];
+
+            const assignedProfiles = assigneeUids
+              .map((uid) => usersMap.get(uid))
+              .filter(Boolean) as UserProfile[];
+
+            const totalChecklist = task.checklist?.length || 0;
+            const completedChecklist = task.checklist?.filter((i) => i.completed).length || 0;
+            const percent = totalChecklist > 0 ? Math.round((completedChecklist / totalChecklist) * 100) : 0;
 
             return (
               <tr
@@ -71,22 +87,70 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                         {task.description}
                       </p>
                     )}
+                    {(() => {
+                      const assigner = usersMap.get(task.assignedBy || task.createdBy);
+                      if (!assigner) return null;
+                      return (
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5 flex items-center gap-1">
+                          <span>By:</span>
+                          <span className="font-medium text-zinc-600 dark:text-zinc-400">{assigner.name}</span>
+                          {(assigner.designation || assigner.team) && (
+                            <span className="text-brand-600 dark:text-brand-400 font-mono">
+                              ({assigner.designation || assigner.team})
+                            </span>
+                          )}
+                        </p>
+                      );
+                    })()}
                   </div>
                 </td>
 
-                {/* Assignee */}
+                {/* Multiple Assignees */}
                 {showAssignee && (
                   <td className="py-3.5 px-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-brand-100 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 font-semibold text-[10px] flex items-center justify-center border border-brand-200 dark:border-brand-800">
-                        {assignee?.name ? assignee.name.charAt(0).toUpperCase() : <UserIcon className="w-3 h-3" />}
+                    {assignedProfiles.length === 0 ? (
+                      <span className="text-xs text-zinc-400">Unassigned</span>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="flex -space-x-1.5 overflow-hidden">
+                          {assignedProfiles.slice(0, 3).map((u) => (
+                            <div
+                              key={u.uid}
+                              title={`${u.name} (${u.team || 'No team'})`}
+                              className="w-6 h-6 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-bold text-[10px] flex items-center justify-center border-2 border-white dark:border-zinc-900"
+                            >
+                              {u.name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+                          ))}
+                        </div>
+                        <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-[110px]">
+                          {assignedProfiles.length === 1
+                            ? assignedProfiles[0].name
+                            : `${assignedProfiles[0].name} +${assignedProfiles.length - 1}`}
+                        </span>
                       </div>
-                      <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium truncate max-w-[110px]">
-                        {assignee?.name || 'Unassigned'}
-                      </span>
-                    </div>
+                    )}
                   </td>
                 )}
+
+                {/* API Checklist Progress Indicator */}
+                <td className="py-3.5 px-4 whitespace-nowrap">
+                  {totalChecklist > 0 ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-1.5 rounded-full bg-zinc-200 dark:bg-zinc-700 overflow-hidden">
+                        <div
+                          className={`h-full ${percent === 100 ? 'bg-emerald-500' : 'bg-brand-500'}`}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </div>
+                      <span className="font-mono text-[11px] text-zinc-600 dark:text-zinc-400">
+                        {completedChecklist}/{totalChecklist}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-zinc-400 text-xs">—</span>
+                  )}
+                </td>
 
                 {/* Team */}
                 <td className="py-3.5 px-4 whitespace-nowrap">
@@ -148,20 +212,24 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 {/* Actions */}
                 <td className="py-3.5 px-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1">
-                    <button
-                      onClick={() => onEdit(task)}
-                      className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(task)}
-                      className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    {onEdit && (!canEditTask || canEditTask(task)) && (
+                      <button
+                        onClick={() => onEdit(task)}
+                        className="p-1.5 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    {onDelete && (
+                      <button
+                        onClick={() => onDelete(task)}
+                        className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

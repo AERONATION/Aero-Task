@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { getUserProfile, updateUserRole, toggleUserActiveStatus } from '@/services/userService';
+import { getUserProfile, updateUserRole, toggleUserActiveStatus, deleteUserProfileDoc } from '@/services/userService';
 import { useAdminTasks } from '@/hooks/useAdminTasks';
 import { usePerformance } from '@/hooks/usePerformance';
 import { UserProfile } from '@/types/user';
@@ -26,6 +26,9 @@ import {
   Clock,
   AlertCircle,
   TrendingUp,
+  Trash2,
+  Ban,
+  UserCheck,
 } from 'lucide-react';
 import {
   CompletionTrendChart,
@@ -41,6 +44,9 @@ export const AdminUserDetail: React.FC = () => {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [taskToEdit, setTaskToEdit] = useState<Task | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [isBlockDialogOpen, setIsBlockDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [recentLogs, setRecentLogs] = useState<ActivityLog[]>([]);
   const { success, error } = useToast();
   const navigate = useNavigate();
@@ -76,7 +82,11 @@ export const AdminUserDetail: React.FC = () => {
   }, [uid, navigate]);
 
   // Tasks assigned to this specific user
-  const userTasks = allTasks.filter((t) => t.assignedTo === uid);
+  const userTasks = allTasks.filter((t) =>
+    Array.isArray(t.assignedTo)
+      ? t.assignedTo.includes(uid || '')
+      : t.assignedTo === uid
+  );
   const { metrics, trend, statusDistribution, onTimeVsLate } = usePerformance(
     userTasks,
     member ? [member] : [],
@@ -105,6 +115,36 @@ export const AdminUserDetail: React.FC = () => {
     }
   };
 
+  const handleBlockToggleConfirm = async () => {
+    if (!member) return;
+    setActionLoading(true);
+    const nextStatus = member.isActive === false ? true : false;
+    try {
+      await toggleUserActiveStatus(member.uid, nextStatus);
+      setMember({ ...member, isActive: nextStatus });
+      success(`${member.name} is now ${nextStatus ? 'active' : 'blocked/deactivated'}`);
+      setIsBlockDialogOpen(false);
+    } catch (err: any) {
+      error(err.message || 'Failed to update account status');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUserConfirm = async () => {
+    if (!member) return;
+    setActionLoading(true);
+    try {
+      await deleteUserProfileDoc(member.uid);
+      success(`User ${member.name} was removed.`);
+      navigate('/admin/users');
+    } catch (err: any) {
+      error(err.message || 'Failed to delete user');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   if (loadingMember) {
     return (
       <div className="py-12 text-center text-zinc-400">
@@ -115,6 +155,8 @@ export const AdminUserDetail: React.FC = () => {
   }
 
   if (!member) return null;
+
+  const isBlocked = member.isActive === false;
 
   return (
     <div className="space-y-6 text-left">
@@ -142,7 +184,7 @@ export const AdminUserDetail: React.FC = () => {
 
       {/* User Profile Card */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-xs">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
+        <div className="flex flex-col lg:flex-row items-center lg:items-start justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
             <div className="w-16 h-16 rounded-2xl bg-brand-600 text-white font-bold text-2xl flex items-center justify-center shrink-0">
               {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
@@ -162,6 +204,18 @@ export const AdminUserDetail: React.FC = () => {
                 >
                   {member.systemRole === 'admin' ? 'Admin' : 'Member'}
                 </span>
+
+                {isBlocked ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                    Blocked
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    Active
+                  </span>
+                )}
               </div>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">{member.email}</p>
               <div className="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs text-zinc-400">
@@ -176,7 +230,7 @@ export const AdminUserDetail: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={async () => {
                 const newRole = member.systemRole === 'admin' ? 'user' : 'admin';
@@ -188,6 +242,24 @@ export const AdminUserDetail: React.FC = () => {
             >
               {member.systemRole === 'admin' ? 'Demote to Member' : 'Promote to Admin'}
             </button>
+
+            <Button
+              variant={isBlocked ? 'secondary' : 'outline'}
+              size="sm"
+              icon={isBlocked ? <UserCheck className="w-3.5 h-3.5 text-emerald-600" /> : <Ban className="w-3.5 h-3.5 text-amber-500" />}
+              onClick={() => setIsBlockDialogOpen(true)}
+            >
+              {isBlocked ? 'Unblock User' : 'Block User'}
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Trash2 className="w-3.5 h-3.5 text-rose-500" />}
+              onClick={() => setIsDeleteDialogOpen(true)}
+            >
+              Remove User
+            </Button>
           </div>
         </div>
       </div>
@@ -326,6 +398,38 @@ export const AdminUserDetail: React.FC = () => {
           title="Delete Task"
           message={`Are you sure you want to permanently delete "${taskToDelete.title}"?`}
           confirmText="Delete"
+        />
+      )}
+
+      {/* Block / Deactivate Confirmation Dialog */}
+      {isBlockDialogOpen && (
+        <ConfirmDialog
+          isOpen={isBlockDialogOpen}
+          onClose={() => setIsBlockDialogOpen(false)}
+          onConfirm={handleBlockToggleConfirm}
+          title={isBlocked ? 'Unblock User' : 'Block / Deactivate User'}
+          message={
+            isBlocked
+              ? `Are you sure you want to unblock ${member.name}? They will regain access to their workspace.`
+              : `Are you sure you want to block ${member.name}? Their account will be deactivated and denied access to all workspace pages.`
+          }
+          confirmText={isBlocked ? 'Unblock' : 'Block User'}
+          variant={isBlocked ? 'primary' : 'danger'}
+          loading={actionLoading}
+        />
+      )}
+
+      {/* Delete User Confirmation Dialog */}
+      {isDeleteDialogOpen && (
+        <ConfirmDialog
+          isOpen={isDeleteDialogOpen}
+          onClose={() => setIsDeleteDialogOpen(false)}
+          onConfirm={handleDeleteUserConfirm}
+          title="Remove User"
+          message={`Are you sure you want to permanently remove "${member.name}" (${member.email})? This action removes their profile from the system and cannot be undone.`}
+          confirmText="Delete User"
+          variant="danger"
+          loading={actionLoading}
         />
       )}
     </div>

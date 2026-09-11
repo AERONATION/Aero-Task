@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
+import { useUsers } from '@/hooks/useUsers';
 import { usePerformance } from '@/hooks/usePerformance';
 import { CardSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -26,11 +27,11 @@ import {
   CheckSquare,
 } from 'lucide-react';
 import { CompletionTrendChart, StatusDistributionChart } from '@/components/charts/PerformanceCharts';
-import { seedFirestoreData } from '@/services/seedService';
 
 export const Dashboard: React.FC = () => {
   const { user, profile } = useAuth();
   const { tasks, allTasks, loading } = useTasks();
+  const { users, usersMap } = useUsers();
   const { metrics, trend, statusDistribution } = usePerformance(allTasks, [], 7);
   const [recentLogs, setRecentLogs] = useState<ActivityLog[]>([]);
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -224,38 +225,12 @@ export const Dashboard: React.FC = () => {
             </div>
 
             {upcomingDeadlines.length === 0 ? (
-              <div className="space-y-4">
-                <EmptyState
-                  title="No impending deadlines"
-                  description="You are completely up to date. Relax, create a new task, or populate sample workspace models to explore live charts."
-                  actionText="Create Task"
-                  onAction={() => setIsTaskModalOpen(true)}
-                />
-                {allTasks.length === 0 && (
-                  <div className="p-4 rounded-xl border border-brand-200 bg-brand-50/40 dark:border-brand-900/60 dark:bg-brand-950/20 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-                    <div className="flex items-center gap-2.5">
-                      <Layers className="w-4 h-4 text-brand-600 dark:text-brand-400 shrink-0" />
-                      <span className="text-zinc-700 dark:text-zinc-300">
-                        Want to explore charts and team metrics right away? Populate sample tasks and departmental models with one click.
-                      </span>
-                    </div>
-                    <button
-                      onClick={async () => {
-                        if (!user) return;
-                        try {
-                          await seedFirestoreData(user.uid, profile?.name || user.displayName || 'User');
-                          success('Sample task models and teams generated!');
-                        } catch (e: any) {
-                          error(e.message || 'Failed to seed sample data');
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded-lg bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors shrink-0 shadow-xs"
-                    >
-                      Seed Demo Models
-                    </button>
-                  </div>
-                )}
-              </div>
+              <EmptyState
+                title="No impending deadlines"
+                description="You are completely up to date. Create a new task or review your workload anytime."
+                actionText="Create Task"
+                onAction={() => setIsTaskModalOpen(true)}
+              />
             ) : (
               <div className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
                 {upcomingDeadlines.map((task) => (
@@ -360,7 +335,11 @@ export const Dashboard: React.FC = () => {
 
       {/* Task Modal */}
       {isTaskModalOpen && (
-        <TaskModal isOpen={isTaskModalOpen} onClose={() => setIsTaskModalOpen(false)} />
+        <TaskModal
+          isOpen={isTaskModalOpen}
+          onClose={() => setIsTaskModalOpen(false)}
+          users={users}
+        />
       )}
     </div>
   );
