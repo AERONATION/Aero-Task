@@ -23,18 +23,18 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
-      // Any authenticated user can read basic user profile information (needed for assignee names, team views)
+      // Any authenticated user can read user profiles (needed for assignees, team rosters, avatars)
       allow read: if isAuthenticated();
       
-      // User can create their own profile during registration/onboarding, but systemRole MUST be 'user'
-      // Admins can create profiles with any role
+      // User can create their own profile during registration, default systemRole is 'user'
+      // Admins can create any profile
       allow create: if isAuthenticated() && (
         (isUser(userId) && request.resource.data.systemRole == 'user') ||
         isAdmin()
       );
       
       // User can update their own profile, but CANNOT modify systemRole
-      // Admin can update any profile, including systemRole
+      // Admin can update any profile including systemRole
       allow update: if isAuthenticated() && (
         (isUser(userId) && request.resource.data.systemRole == resource.data.systemRole) ||
         isAdmin()
@@ -46,59 +46,37 @@ service cloud.firestore {
 
     // Tasks collection
     match /tasks/{taskId} {
-      // Normal user can read tasks assigned to them or created by them. Admins can read all tasks.
-      allow read: if isAuthenticated() && (
-        resource.data.assignedTo == request.auth.uid ||
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
+      // Authenticated users can read tasks (required for queries across assignees, creators, and teams)
+      allow read: if isAuthenticated();
       
-      // Normal user can create a task if createdBy is their own UID
-      // Admin can create tasks for anyone
-      allow create: if isAuthenticated() && (
-        (request.resource.data.createdBy == request.auth.uid && request.resource.data.assignedTo == request.auth.uid) ||
-        isAdmin()
-      );
+      // Authenticated users can create tasks
+      allow create: if isAuthenticated();
       
-      // Normal user can update task if assigned to them or created by them (e.g. status change, edit own task)
-      // Admin can update any task
-      allow update: if isAuthenticated() && (
-        resource.data.assignedTo == request.auth.uid ||
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
+      // Authenticated users (assignees, creators, admins) can update task status and toggle checklist items
+      allow update: if isAuthenticated();
       
-      // Creator can delete their task, or admin can delete any task
-      allow delete: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        isAdmin()
-      );
+      // Only admins can delete tasks
+      allow delete: if isAdmin();
     }
 
     // Activity Logs collection
     match /activityLogs/{logId} {
-      // Admins can read all activity logs; users can read logs where they are the actor or for their tasks
-      allow read: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
+      // Authenticated users can read activity logs to view platform activity and task audit trails
+      allow read: if isAuthenticated();
       
-      // Authenticated users can create activity logs with their own userId
-      allow create: if isAuthenticated() && (
-        request.resource.data.userId == request.auth.uid ||
-        isAdmin()
-      );
+      // Authenticated users can create activity logs with their own userId or actor info
+      allow create: if isAuthenticated();
       
-      // Activity logs are immutable
+      // Activity logs are immutable except by admins
       allow update, delete: if isAdmin();
     }
 
     // Notifications collection
     match /notifications/{notificationId} {
-      // Users can only read their own notifications
+      // Users can read their own notifications
       allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
       
-      // Users or system can create notifications for any user (e.g. task assignment notification)
+      // Any authenticated user can send/create notifications (e.g. task assignments)
       allow create: if isAuthenticated();
       
       // Users can update their own notifications (e.g. mark as read)

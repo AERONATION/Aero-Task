@@ -13,7 +13,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, tasksCol, activityLogsCol } from '@/firebase/firestore';
-import { Task, TaskPriority, TaskStatus, ActivityAction, ActivityLog } from '@/types/task';
+import { Task, TaskPriority, TaskStatus, ActivityAction, ActivityLog, ChecklistItem } from '@/types/task';
 import { createNotification } from './notificationService';
 
 export interface CreateTaskInput {
@@ -27,6 +27,39 @@ export interface CreateTaskInput {
   deadline: Date | Timestamp;
   creatorName?: string;
   assigneeNames?: string[];
+  checklist?: ChecklistItem[];  // Array of API / Todo test items
+}
+
+/**
+ * Sanitizes checklist items so Firestore never receives `undefined`
+ */
+export function sanitizeChecklist(items?: ChecklistItem[]): ChecklistItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => ({
+    id: item.id || ('chk_' + Math.random().toString(36).substring(2, 9)),
+    title: String(item.title || 'API Item').trim(),
+    method: String(item.method || 'GET').trim().toUpperCase(),
+    endpoint: String(item.endpoint || '').trim(),
+    description: String(item.description || '').trim(),
+    completed: Boolean(item.completed),
+    completedBy: item.completedBy || null,
+    completedByName: item.completedByName || null,
+    completedAt: item.completedAt || null,
+  }));
+}
+
+export function normalizeTaskData(docId: string, data: any): Task {
+  const assignedTo = Array.isArray(data.assignedTo)
+    ? data.assignedTo
+    : data.assignedTo
+    ? [data.assignedTo]
+    : [];
+  return {
+    id: docId,
+    ...data,
+    assignedTo,
+    checklist: sanitizeChecklist(data.checklist),
+  };
 }
 
 /**
@@ -39,12 +72,18 @@ export async function logActivity(
   metadata?: Record<string, any>
 ): Promise<void> {
   try {
+    const cleanMeta: Record<string, any> = {};
+    if (metadata) {
+      for (const [k, v] of Object.entries(metadata)) {
+        if (v !== undefined) cleanMeta[k] = v;
+      }
+    }
     await addDoc(activityLogsCol, {
-      userId,
-      taskId,
+      userId: userId || 'system',
+      taskId: taskId || '',
       action,
       timestamp: serverTimestamp(),
-      metadata: metadata || {},
+      metadata: cleanMeta,
     });
   } catch (err) {
     console.warn('Failed to log activity:', err);
@@ -58,22 +97,29 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
   const deadlineTimestamp =
     input.deadline instanceof Timestamp ? input.deadline : Timestamp.fromDate(new Date(input.deadline));
 
-  const assignedTo = Array.isArray(input.assignedTo) ? input.assignedTo : [input.assignedTo];
+  const assignedTo = Array.isArray(input.assignedTo)
+    ? input.assignedTo.filter(Boolean)
+    : input.assignedTo
+    ? [input.assignedTo]
+    : [];
+
+  const cleanedChecklist = sanitizeChecklist(input.checklist);
 
   const taskData = {
-    title: input.title.trim(),
-    description: input.description.trim(),
-    createdBy: input.createdBy,
-    assignedTo,
+    title: (input.title || '').trim(),
+    description: (input.description || '').trim(),
+    createdBy: input.createdBy || '',
+    assignedTo: assignedTo.length > 0 ? assignedTo : [input.createdBy],
     assignedBy: input.assignedBy || null,
     team: input.team || null,
-    priority: input.priority,
+    priority: input.priority || 'medium',
     status: 'todo' as TaskStatus,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     deadline: deadlineTimestamp,
     completedAt: null,
     startedAt: null,
+    checklist: cleanedChecklist,
   };
 
   const docRef = await addDoc(tasksCol, taskData);
@@ -81,24 +127,99 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
 
   // Log creation activity
   await logActivity(input.createdBy, taskId, 'task_created', {
-    taskTitle: input.title,
-    assignedTo,
+    taskTitle: taskData.title,
+    assignedTo: taskData.assignedTo,
+    checklistCount: cleanedChecklist.length,
   });
 
   // Notify all assignees (skip creator themselves)
-  for (const uid of assignedTo) {
+  for (const uid of taskData.assignedTo) {
     if (uid && uid !== input.createdBy) {
       await createNotification(
         uid,
         'task_assigned',
         'New Task Assigned',
-        `You were assigned: "${input.title}" by ${input.creatorName || 'a teammate'}`,
+        `You were assigned: "${taskData.title}" by ${input.creatorName || 'a teammate'}`,
         taskId
       );
     }
   }
 
   return taskId;
+}
+
+/**
+ * Toggles or updates a single checklist item in a task
+ */
+export async function toggleTaskChecklistItem(
+  taskId: string,
+  itemId: string,
+  completed: boolean,
+  actorUid: string,
+  actorName: string
+): Promise<ChecklistItem[]> {
+  const taskRef = doc(db, 'tasks', taskId);
+  const snap = await getDoc(taskRef);
+  if (!snap.exists()) throw new Error('Task not found');
+
+  const taskData = snap.data();
+  const currentChecklist: ChecklistItem[] = sanitizeChecklist(taskData.checklist);
+
+  let toggledTitle = '';
+  const updatedChecklist = currentChecklist.map((item) => {
+    if (item.id === itemId) {
+      toggledTitle = item.title;
+      return {
+        ...item,
+        completed,
+        completedBy: completed ? actorUid : null,
+        completedByName: completed ? actorName : null,
+        completedAt: completed ? new Date().toISOString() : null,
+      };
+    }
+    return item;
+  });
+
+  await updateDoc(taskRef, {
+    checklist: updatedChecklist,
+    updatedAt: serverTimestamp(),
+  });
+
+  const completedCount = updatedChecklist.filter((i) => i.completed).length;
+
+  await logActivity(actorUid, taskId, 'checklist_item_toggled', {
+    itemId,
+    itemTitle: toggledTitle,
+    completed,
+    actorName,
+    progress: `${completedCount}/${updatedChecklist.length}`,
+  });
+
+  return updatedChecklist;
+}
+
+/**
+ * Updates full checklist array for a task
+ */
+export async function updateTaskChecklist(
+  taskId: string,
+  checklist: ChecklistItem[],
+  actorUid: string,
+  actorName: string
+): Promise<void> {
+  const taskRef = doc(db, 'tasks', taskId);
+  const cleanedChecklist = sanitizeChecklist(checklist);
+
+  await updateDoc(taskRef, {
+    checklist: cleanedChecklist,
+    updatedAt: serverTimestamp(),
+  });
+
+  await logActivity(actorUid, taskId, 'checklist_updated', {
+    totalItems: cleanedChecklist.length,
+    completedItems: cleanedChecklist.filter((i) => i.completed).length,
+    actorName,
+  });
 }
 
 /**
@@ -113,22 +234,38 @@ export async function updateTask(
   const taskRef = doc(db, 'tasks', taskId);
 
   const cleanUpdates: Record<string, any> = {
-    ...updates,
     updatedAt: serverTimestamp(),
   };
 
-  if (updates.deadline) {
+  if (updates.title !== undefined) cleanUpdates.title = updates.title.trim();
+  if (updates.description !== undefined) cleanUpdates.description = updates.description.trim();
+  if (updates.priority !== undefined) cleanUpdates.priority = updates.priority;
+  if (updates.status !== undefined) cleanUpdates.status = updates.status;
+  if (updates.team !== undefined) cleanUpdates.team = updates.team || null;
+  if (updates.assignedBy !== undefined) cleanUpdates.assignedBy = updates.assignedBy || null;
+
+  if (updates.deadline !== undefined) {
     cleanUpdates.deadline =
       updates.deadline instanceof Timestamp
         ? updates.deadline
         : Timestamp.fromDate(new Date(updates.deadline));
   }
 
+  if (updates.assignedTo !== undefined) {
+    cleanUpdates.assignedTo = Array.isArray(updates.assignedTo)
+      ? updates.assignedTo.filter(Boolean)
+      : [updates.assignedTo].filter(Boolean);
+  }
+
+  if (updates.checklist !== undefined) {
+    cleanUpdates.checklist = sanitizeChecklist(updates.checklist);
+  }
+
   await updateDoc(taskRef, cleanUpdates);
 
   await logActivity(actorUid, taskId, 'task_updated', {
     updatedBy: actorName,
-    changes: Object.keys(updates),
+    changes: Object.keys(cleanUpdates),
   });
 }
 
@@ -182,7 +319,7 @@ export async function updateTaskStatus(
 }
 
 /**
- * Assigns or reassigns task to a user
+ * Assigns or reassigns task to users
  */
 export async function assignTask(
   taskId: string,
@@ -240,7 +377,7 @@ export async function getTaskById(taskId: string): Promise<Task | null> {
   const taskRef = doc(db, 'tasks', taskId);
   const snap = await getDoc(taskRef);
   if (!snap.exists()) return null;
-  return { id: snap.id, ...(snap.data() as Omit<Task, 'id'>) };
+  return normalizeTaskData(snap.id, snap.data());
 }
 
 /**
@@ -253,31 +390,72 @@ export function subscribeUserTasks(
 ) {
   if (!userId) return () => {};
 
-  // Subscribe to tasks where user is in the assignedTo array
-  const q = query(tasksCol, where('assignedTo', 'array-contains', userId));
+  const assignedTasksMap = new Map<string, Task>();
+  const createdTasksMap = new Map<string, Task>();
+  const legacyTasksMap = new Map<string, Task>();
 
-  return onSnapshot(
-    q,
+  const emitCombined = () => {
+    const allMap = new Map<string, Task>();
+    legacyTasksMap.forEach((v, k) => allMap.set(k, v));
+    createdTasksMap.forEach((v, k) => allMap.set(k, v));
+    assignedTasksMap.forEach((v, k) => allMap.set(k, v));
+
+    const tasks = Array.from(allMap.values());
+    tasks.sort((a, b) => {
+      const aTime = a.deadline?.seconds ? a.deadline.seconds * 1000 : new Date(a.deadline || 0).getTime();
+      const bTime = b.deadline?.seconds ? b.deadline.seconds * 1000 : new Date(b.deadline || 0).getTime();
+      return aTime - bTime;
+    });
+
+    callback(tasks);
+  };
+
+  // 1. Array contains (all multiple assignees)
+  const qArray = query(tasksCol, where('assignedTo', 'array-contains', userId));
+  const unsubArray = onSnapshot(
+    qArray,
     (snap) => {
-      const tasks: Task[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Task, 'id'>),
-      }));
-
-      // Sort client-side by deadline ascending
-      tasks.sort((a, b) => {
-        const aTime = a.deadline?.seconds ? a.deadline.seconds * 1000 : new Date(a.deadline || 0).getTime();
-        const bTime = b.deadline?.seconds ? b.deadline.seconds * 1000 : new Date(b.deadline || 0).getTime();
-        return aTime - bTime;
-      });
-
-      callback(tasks);
+      assignedTasksMap.clear();
+      snap.docs.forEach((d) => assignedTasksMap.set(d.id, normalizeTaskData(d.id, d.data())));
+      emitCombined();
     },
     (err) => {
-      console.error('Error in user tasks subscription:', err);
+      console.warn('Error in qArray subscription:', err);
       if (onError) onError(err);
     }
   );
+
+  // 2. Created by user (so creators always see tasks they assigned to others)
+  const qCreated = query(tasksCol, where('createdBy', '==', userId));
+  const unsubCreated = onSnapshot(
+    qCreated,
+    (snap) => {
+      createdTasksMap.clear();
+      snap.docs.forEach((d) => createdTasksMap.set(d.id, normalizeTaskData(d.id, d.data())));
+      emitCombined();
+    },
+    (err) => {
+      console.warn('Error in qCreated subscription:', err);
+    }
+  );
+
+  // 3. Legacy string assignedTo format fallback
+  const qLegacy = query(tasksCol, where('assignedTo', '==', userId));
+  const unsubLegacy = onSnapshot(
+    qLegacy,
+    (snap) => {
+      legacyTasksMap.clear();
+      snap.docs.forEach((d) => legacyTasksMap.set(d.id, normalizeTaskData(d.id, d.data())));
+      emitCombined();
+    },
+    () => {}
+  );
+
+  return () => {
+    unsubArray();
+    unsubCreated();
+    unsubLegacy();
+  };
 }
 
 /**
@@ -290,10 +468,7 @@ export function subscribeAllTasks(
   return onSnapshot(
     tasksCol,
     (snap) => {
-      const tasks: Task[] = snap.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as Omit<Task, 'id'>),
-      }));
+      const tasks: Task[] = snap.docs.map((d) => normalizeTaskData(d.id, d.data()));
 
       // Sort client-side by createdAt descending
       tasks.sort((a, b) => {

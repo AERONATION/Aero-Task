@@ -1,61 +1,37 @@
-import React, { useState } from 'react';
-import { Shield, Database, Lock, Key, Terminal, Server, CheckCircle2, Sparkles, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { seedFirestoreData } from '@/services/seedService';
-import { useAuth } from '@/hooks/useAuth';
-import { useToast } from '@/context/ToastContext';
+import React from 'react';
+import { Shield, Key, Terminal, CheckCircle2, Moon } from 'lucide-react';
+import { ThemeSelector } from '@/components/ui/ThemeToggle';
 
 export const AdminSettings: React.FC = () => {
-  const { user, profile } = useAuth();
-  const { success, error } = useToast();
-  const [seeding, setSeeding] = useState(false);
-
-  const handleSeedDatabase = async () => {
-    if (!user) return;
-    setSeeding(true);
-    try {
-      await seedFirestoreData(user.uid, profile?.name || user.displayName || 'Admin User');
-      success('Database seeded successfully with sample models, tasks, and teams!');
-    } catch (err: any) {
-      console.error('Seed error:', err);
-      error(err.message || 'Failed to seed database');
-    } finally {
-      setSeeding(false);
-    }
-  };
-
   return (
     <div className="max-w-4xl mx-auto space-y-6 text-left">
       {/* Header */}
       <div className="pb-2 border-b border-zinc-200 dark:border-zinc-800">
         <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">
-          System Administration & Security
+          System Administration & Settings
         </h2>
         <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-          Architecture overview, access control policies, and infrastructure configuration
+          Appearance, access control policies, and infrastructure configuration
         </p>
       </div>
 
-      {/* Database Models & Sample Data Seeder */}
+      {/* Global Appearance Card */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-xs space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
-            <Database className="w-5 h-5 text-brand-600 dark:text-brand-400" />
-            <h3 className="text-sm font-bold">Initialize Database Models & Sample Records</h3>
-          </div>
-          <Button
-            size="sm"
-            onClick={handleSeedDatabase}
-            loading={seeding}
-            icon={<Sparkles className="w-3.5 h-3.5 text-amber-400" />}
-          >
-            Seed Database Models
-          </Button>
+        <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
+          <Moon className="w-5 h-5 text-indigo-500" />
+          <h3 className="text-sm font-bold">Theme & UI Mode</h3>
         </div>
 
         <p className="text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-          Instantly populate your live Cloud Firestore database with standard task models, 7 department rosters, activity logs, and real delivery timestamps to view live Recharts analytics immediately.
+          Switch interface between light mode, dark mode, or automatic system synchronization.
         </p>
+
+        <div className="pt-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            Current Theme
+          </span>
+          <ThemeSelector />
+        </div>
       </div>
 
       {/* Security Architecture Card */}
@@ -80,7 +56,7 @@ export const AdminSettings: React.FC = () => {
         </div>
       </div>
 
-      {/* Initial Admin Bootstrap Guide */}
+      {/* Initial Admin Provisioning Guide */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-xs space-y-4">
         <div className="flex items-center gap-2 text-zinc-900 dark:text-white">
           <Key className="w-5 h-5 text-amber-500" />
@@ -93,7 +69,7 @@ export const AdminSettings: React.FC = () => {
 
         <div className="space-y-3">
           <div className="p-3.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-xs font-mono space-y-2">
-            <div className="text-zinc-400 text-[11px]">// Method 1: Firebase Console (Recommended for initial setup)</div>
+            <div className="text-zinc-400 text-[11px]">// Method: Firebase Console (Initial Setup)</div>
             <p className="text-zinc-700 dark:text-zinc-300">
               1. Register a standard user account in the AeroTask login screen (or sign in with Google).
             </p>

@@ -4,6 +4,18 @@ import { TeamType } from './user';
 export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskStatus = 'todo' | 'in_progress' | 'completed';
 
+export interface ChecklistItem {
+  id: string;
+  title: string;
+  method?: string;          // e.g. 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+  endpoint?: string;        // e.g. '/api/v1/users'
+  description?: string;
+  completed: boolean;
+  completedBy?: string;     // UID of user who marked it complete
+  completedByName?: string; // Display name
+  completedAt?: Timestamp | string | null | any;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -19,6 +31,7 @@ export interface Task {
   deadline: Timestamp | any;
   completedAt?: Timestamp | null | any;
   startedAt?: Timestamp | null | any;
+  checklist?: ChecklistItem[];  // Array of API / Todo test items
 }
 
 export type ActivityAction =
@@ -27,7 +40,9 @@ export type ActivityAction =
   | 'task_completed'
   | 'task_updated'
   | 'task_reopened'
-  | 'task_assigned';
+  | 'task_assigned'
+  | 'checklist_updated'
+  | 'checklist_item_toggled';
 
 export interface ActivityLog {
   id: string;

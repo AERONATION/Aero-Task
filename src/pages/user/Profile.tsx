@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/Select';
 import { TEAMS, TeamType } from '@/types/user';
 import { formatDate } from '@/utils/date';
 import { useToast } from '@/context/ToastContext';
+import { ThemeSelector } from '@/components/ui/ThemeToggle';
 import { User, Mail, Shield, Briefcase, Calendar, CheckCircle2 } from 'lucide-react';
 
 export const Profile: React.FC = () => {
@@ -150,6 +151,25 @@ export const Profile: React.FC = () => {
             </Button>
           </div>
         </form>
+      </div>
+
+      {/* Appearance & Theme Card */}
+      <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-xs space-y-4">
+        <div>
+          <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
+            Appearance & Theme
+          </h4>
+          <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+            Choose your preferred interface theme (Light, Dark, or System automatic sync)
+          </p>
+        </div>
+
+        <div className="pt-2 flex items-center justify-between">
+          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            Interface Appearance
+          </span>
+          <ThemeSelector />
+        </div>
       </div>
     </div>
   );

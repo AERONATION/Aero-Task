@@ -61,9 +61,13 @@ export const AdminTeams: React.FC = () => {
     TEAMS.forEach((team) => {
       const members = users.filter((u) => u.team === team);
       const memberUids = new Set(members.map((m) => m.uid));
-      const tasks = allTasks.filter(
-        (t) => t.team === team || (t.assignedTo && memberUids.has(t.assignedTo))
-      );
+      const tasks = allTasks.filter((t) => {
+        if (t.team === team) return true;
+        if (Array.isArray(t.assignedTo)) {
+          return t.assignedTo.some((uid) => memberUids.has(uid));
+        }
+        return t.assignedTo && memberUids.has(t.assignedTo);
+      });
       const metrics = calculatePerformanceMetrics(tasks);
       map.set(team, { members, tasks, metrics });
     });
@@ -290,7 +294,7 @@ export const AdminTeams: React.FC = () => {
                   <TaskCard
                     key={task.id}
                     task={task}
-                    assignedUser={usersMap.get(task.assignedTo)}
+                    usersMap={usersMap}
                     onStatusChange={handleStatusChange}
                     onEdit={(t) => {
                       setTaskToEdit(t);

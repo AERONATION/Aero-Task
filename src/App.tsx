@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { ToastProvider } from '@/context/ToastContext';
 import { NotificationProvider } from '@/context/NotificationContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { AdminRoute } from '@/routes/AdminRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -37,9 +38,10 @@ const RootRedirect: React.FC = () => {
 
 export const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <NotificationProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ToastProvider>
+          <NotificationProvider>
           <BrowserRouter>
             <Routes>
               {/* Public Auth Routes */}
@@ -101,6 +103,7 @@ export const App: React.FC = () => {
         </NotificationProvider>
       </ToastProvider>
     </AuthProvider>
+  </ThemeProvider>
   );
 };
 

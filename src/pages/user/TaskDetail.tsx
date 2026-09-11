@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { getTaskById, updateTaskStatus, deleteTask, subscribeTaskLogs } from '@/services/taskService';
-import { getUserProfile } from '@/services/userService';
-import { Task, ActivityLog, TaskStatus } from '@/types/task';
+import {
+  getTaskById,
+  updateTaskStatus,
+  deleteTask,
+  subscribeTaskLogs,
+  toggleTaskChecklistItem,
+  updateTaskChecklist,
+} from '@/services/taskService';
+import { getUserProfile, getAllUsers } from '@/services/userService';
+import { Task, ActivityLog, TaskStatus, ChecklistItem } from '@/types/task';
 import { UserProfile } from '@/types/user';
 import { useAuth } from '@/hooks/useAuth';
 import { Badge } from '@/components/ui/Badge';
@@ -10,6 +17,7 @@ import { DeadlineBadge } from '@/components/tasks/DeadlineBadge';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TaskModal } from '@/components/tasks/TaskModal';
+import { ApiChecklist } from '@/components/tasks/ApiChecklist';
 import { formatDate, formatRelativeDate } from '@/utils/date';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -21,9 +29,11 @@ import {
   Edit2,
   Trash2,
   User,
+  Users,
   Shield,
   History,
   AlertOctagon,
+  Code2,
 } from 'lucide-react';
 
 export const TaskDetail: React.FC = () => {
@@ -33,8 +43,10 @@ export const TaskDetail: React.FC = () => {
   const { success, error } = useToast();
 
   const [task, setTask] = useState<Task | null>(null);
-  const [assignee, setAssignee] = useState<UserProfile | null>(null);
+  const [assignees, setAssignees] = useState<UserProfile[]>([]);
   const [creator, setCreator] = useState<UserProfile | null>(null);
+  const [assigner, setAssigner] = useState<UserProfile | null>(null);
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -50,19 +62,40 @@ export const TaskDetail: React.FC = () => {
         const fetchedTask = await getTaskById(taskId);
         if (!fetchedTask) {
           error('Task not found');
-          navigate('/user/tasks');
+          navigate(isAdmin ? '/admin/tasks' : '/user/tasks');
           return;
         }
         setTask(fetchedTask);
 
-        // Fetch user profiles for creator and assignee
-        if (fetchedTask.assignedTo) {
-          const a = await getUserProfile(fetchedTask.assignedTo);
-          setAssignee(a);
+        // Fetch user profiles for all assignees
+        if (fetchedTask.assignedTo && fetchedTask.assignedTo.length > 0) {
+          const profiles = await Promise.all(
+            fetchedTask.assignedTo.map((uid) => getUserProfile(uid))
+          );
+          setAssignees(profiles.filter(Boolean) as UserProfile[]);
+        } else {
+          setAssignees([]);
         }
+
+        // Fetch creator
+        let creatorProfile: UserProfile | null = null;
         if (fetchedTask.createdBy) {
-          const c = await getUserProfile(fetchedTask.createdBy);
-          setCreator(c);
+          creatorProfile = await getUserProfile(fetchedTask.createdBy);
+          setCreator(creatorProfile);
+        }
+
+        // Fetch assigner (if assignedBy is set)
+        if (fetchedTask.assignedBy) {
+          const ass = await getUserProfile(fetchedTask.assignedBy);
+          setAssigner(ass);
+        } else if (creatorProfile) {
+          setAssigner(creatorProfile);
+        }
+
+        // Load all users for edit modal if admin
+        if (isAdmin) {
+          const uList = await getAllUsers();
+          setAllUsers(uList);
         }
       } catch (err: any) {
         console.error('Failed to load task:', err);
@@ -80,7 +113,7 @@ export const TaskDetail: React.FC = () => {
     });
 
     return () => unsub();
-  }, [taskId, navigate]);
+  }, [taskId, navigate, isAdmin]);
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
     if (!task || !user) return;
@@ -99,13 +132,46 @@ export const TaskDetail: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleToggleChecklistItem = async (itemId: string, completed: boolean) => {
     if (!task || !user) return;
+    try {
+      const updatedChecklist = await toggleTaskChecklistItem(
+        task.id,
+        itemId,
+        completed,
+        user.uid,
+        profile?.name || user.displayName || 'User'
+      );
+      setTask((prev) => (prev ? { ...prev, checklist: updatedChecklist } : null));
+      success(completed ? 'API endpoint marked as tested' : 'API endpoint unchecked');
+    } catch (err: any) {
+      error(err.message || 'Failed to update test checklist item');
+    }
+  };
+
+  const handleUpdateChecklistStructure = async (items: ChecklistItem[]) => {
+    if (!task || !user) return;
+    try {
+      await updateTaskChecklist(
+        task.id,
+        items,
+        user.uid,
+        profile?.name || user.displayName || 'User'
+      );
+      setTask((prev) => (prev ? { ...prev, checklist: items } : null));
+      success('Checklist endpoints updated successfully');
+    } catch (err: any) {
+      error(err.message || 'Failed to update checklist');
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!task || !user || !isAdmin) return;
     setDeleteLoading(true);
     try {
       await deleteTask(task.id, user.uid, task.title);
       success('Task deleted successfully');
-      navigate('/user/tasks');
+      navigate(isAdmin ? '/admin/tasks' : '/user/tasks');
     } catch (err: any) {
       error(err.message || 'Failed to delete task');
     } finally {
@@ -124,8 +190,11 @@ export const TaskDetail: React.FC = () => {
 
   if (!task) return null;
 
-  const canEdit = isAdmin || task.createdBy === user?.uid || task.assignedTo === user?.uid;
-  const canDelete = isAdmin || task.createdBy === user?.uid;
+  const isAssigner = Boolean(
+    user && (isAdmin || task.createdBy === user.uid || task.assignedBy === user.uid)
+  );
+  const canEdit = isAssigner;
+  const canDelete = isAdmin;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 text-left">
@@ -235,41 +304,90 @@ export const TaskDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Metadata Details Grid */}
+        {/* Metadata Details Grid with Multiple Assignees & Assigner Designation */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+          {/* Multiple Assignees Display */}
           <div>
-            <span className="text-zinc-400 block mb-1">Assigned To</span>
-            <div className="flex items-center gap-2 font-medium text-zinc-800 dark:text-zinc-200">
-              <div className="w-5 h-5 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-bold text-[10px] flex items-center justify-center">
-                {assignee?.name?.charAt(0) || 'U'}
+            <span className="text-zinc-400 block mb-1 font-medium">
+              Assigned To ({assignees.length || task.assignedTo?.length || 0})
+            </span>
+            {assignees.length === 0 ? (
+              <span className="font-medium text-zinc-400">Unassigned</span>
+            ) : (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                {assignees.map((a) => (
+                  <div
+                    key={a.uid}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-medium text-[11px]"
+                    title={`${a.name} (${a.designation || a.team || a.email})`}
+                  >
+                    <div className="w-4 h-4 rounded-full bg-brand-200 dark:bg-brand-900 text-brand-700 dark:text-brand-300 font-bold text-[9px] flex items-center justify-center">
+                      {a.name?.charAt(0).toUpperCase() || 'U'}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate max-w-[110px] leading-tight">{a.name}</span>
+                      {(a.designation || a.team) && (
+                        <span className="text-[9px] text-zinc-400 font-mono truncate max-w-[110px]">
+                          {a.designation || a.team}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-              <span>{assignee?.name || 'Unassigned'}</span>
+            )}
+          </div>
+
+          {/* Assigned By with Designation */}
+          <div>
+            <span className="text-zinc-400 block mb-1 font-medium">Assigned By</span>
+            <div className="flex items-start gap-2 text-zinc-800 dark:text-zinc-200">
+              <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 font-bold text-[11px] flex items-center justify-center shrink-0 mt-0.5 border border-amber-200 dark:border-amber-800">
+                {(assigner?.name || creator?.name || 'A').charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-zinc-900 dark:text-white leading-tight truncate">
+                  {assigner?.name || creator?.name || 'Admin'}
+                </p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <span className="text-[10px] font-medium text-brand-600 dark:text-brand-400 font-mono">
+                    {assigner?.designation ||
+                      assigner?.team ||
+                      creator?.designation ||
+                      creator?.team ||
+                      (creator?.systemRole === 'admin' ? 'Administrator' : 'Team Lead')}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
           <div>
-            <span className="text-zinc-400 block mb-1">Created By</span>
-            <div className="flex items-center gap-2 font-medium text-zinc-800 dark:text-zinc-200">
-              <User className="w-4 h-4 text-zinc-400" />
-              <span>{creator?.name || 'Teammate'}</span>
-            </div>
-          </div>
-
-          <div>
-            <span className="text-zinc-400 block mb-1">Created Date</span>
+            <span className="text-zinc-400 block mb-1 font-medium">Created Date</span>
             <span className="font-medium text-zinc-800 dark:text-zinc-200">
               {formatDate(task.createdAt, true)}
             </span>
           </div>
 
           <div>
-            <span className="text-zinc-400 block mb-1">Deadline</span>
+            <span className="text-zinc-400 block mb-1 font-medium">Deadline</span>
             <span className="font-medium text-zinc-800 dark:text-zinc-200">
               {formatDate(task.deadline)}
             </span>
           </div>
         </div>
       </div>
+
+      {/* Interactive API Checklist Section */}
+      <ApiChecklist
+        items={task.checklist || []}
+        onToggleItem={handleToggleChecklistItem}
+        onUpdateItems={isAdmin ? handleUpdateChecklistStructure : undefined}
+        readOnly={!canEdit}
+        canEditStructure={isAdmin}
+        title="API Testing Checklist & Endpoints"
+        description="Verify endpoints, toggle completion status, and monitor team progress in real time"
+      />
 
       {/* Activity Logs & History Timeline */}
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-xs space-y-4">
@@ -289,12 +407,17 @@ export const TaskDetail: React.FC = () => {
                 <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-white dark:ring-zinc-900" />
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                    {log.action.replace('task_', '').replace('_', ' ').toUpperCase()}
+                    {log.action.replace('task_', '').replace('checklist_', 'API: ').replace('_', ' ').toUpperCase()}
                   </span>
                   <span className="text-[11px] text-zinc-400 font-mono">
                     {formatRelativeDate(log.timestamp)}
                   </span>
                 </div>
+                {log.metadata?.itemTitle && (
+                  <p className="text-zinc-600 dark:text-zinc-300 font-mono text-[11px] mt-0.5">
+                    {log.metadata.itemTitle} - {log.metadata.completed ? 'COMPLETED' : 'UNCHECKED'} ({log.metadata.progress})
+                  </p>
+                )}
                 {log.metadata?.actorName && (
                   <p className="text-zinc-500 dark:text-zinc-400 mt-0.5">
                     Triggered by {log.metadata.actorName}
@@ -312,10 +435,19 @@ export const TaskDetail: React.FC = () => {
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
           task={task}
+          users={allUsers.length > 0 ? allUsers : assignees}
           onSuccess={async () => {
             if (taskId) {
               const updated = await getTaskById(taskId);
-              if (updated) setTask(updated);
+              if (updated) {
+                setTask(updated);
+                if (updated.assignedTo && updated.assignedTo.length > 0) {
+                  const profiles = await Promise.all(
+                    updated.assignedTo.map((uid) => getUserProfile(uid))
+                  );
+                  setAssignees(profiles.filter(Boolean) as UserProfile[]);
+                }
+              }
             }
           }}
         />

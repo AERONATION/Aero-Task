@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { TableRowSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { updateUserRole, toggleUserActiveStatus } from '@/services/userService';
+import { updateUserRole, toggleUserActiveStatus, deleteUserProfileDoc } from '@/services/userService';
 import { useToast } from '@/context/ToastContext';
 import { Link } from 'react-router-dom';
 import {
@@ -26,6 +26,8 @@ import {
   Clock,
   AlertCircle,
   TrendingUp,
+  Trash2,
+  Ban,
 } from 'lucide-react';
 
 export const AdminUsers: React.FC = () => {
@@ -33,8 +35,11 @@ export const AdminUsers: React.FC = () => {
   const { allTasks, loading: tasksLoading } = useAdminTasks();
   const [search, setSearch] = useState('');
   const [selectedTeam, setSelectedTeam] = useState('all');
+  const [selectedStatus, setSelectedStatus] = useState<'all' | 'active' | 'blocked'>('all');
   const [assignUserTarget, setAssignUserTarget] = useState<UserProfile | null>(null);
   const [roleChangeUser, setRoleChangeUser] = useState<UserProfile | null>(null);
+  const [userToBlock, setUserToBlock] = useState<UserProfile | null>(null);
+  const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const { success, error } = useToast();
 
@@ -44,7 +49,11 @@ export const AdminUsers: React.FC = () => {
   const userMetricsMap = useMemo(() => {
     const map = new Map<string, ReturnType<typeof calculatePerformanceMetrics>>();
     users.forEach((user) => {
-      const userTasks = allTasks.filter((t) => t.assignedTo === user.uid);
+      const userTasks = allTasks.filter((t) =>
+        Array.isArray(t.assignedTo)
+          ? t.assignedTo.includes(user.uid)
+          : t.assignedTo === user.uid
+      );
       map.set(user.uid, calculatePerformanceMetrics(userTasks));
     });
     return map;
@@ -64,9 +73,15 @@ export const AdminUsers: React.FC = () => {
         if (u.team !== selectedTeam) return false;
       }
 
+      if (selectedStatus === 'active') {
+        if (u.isActive === false) return false;
+      } else if (selectedStatus === 'blocked') {
+        if (u.isActive !== false) return false;
+      }
+
       return true;
     });
-  }, [users, search, selectedTeam]);
+  }, [users, search, selectedTeam, selectedStatus]);
 
   const handleRoleToggle = async () => {
     if (!roleChangeUser) return;
@@ -83,13 +98,33 @@ export const AdminUsers: React.FC = () => {
     }
   };
 
-  const handleToggleActive = async (targetUser: UserProfile) => {
-    const nextStatus = targetUser.isActive === false ? true : false;
+  const handleBlockToggleConfirm = async () => {
+    if (!userToBlock) return;
+    setActionLoading(true);
+    const isCurrentlyActive = userToBlock.isActive !== false;
+    const nextStatus = !isCurrentlyActive;
     try {
-      await toggleUserActiveStatus(targetUser.uid, nextStatus);
-      success(`${targetUser.name} is now ${nextStatus ? 'active' : 'inactive'}`);
+      await toggleUserActiveStatus(userToBlock.uid, nextStatus);
+      success(`${userToBlock.name} is now ${nextStatus ? 'active' : 'blocked/deactivated'}`);
+      setUserToBlock(null);
     } catch (err: any) {
-      error(err.message || 'Failed to change status');
+      error(err.message || 'Failed to change account status');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleDeleteUserConfirm = async () => {
+    if (!userToDelete) return;
+    setActionLoading(true);
+    try {
+      await deleteUserProfileDoc(userToDelete.uid);
+      success(`User ${userToDelete.name} was successfully removed.`);
+      setUserToDelete(null);
+    } catch (err: any) {
+      error(err.message || 'Failed to delete user');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -102,7 +137,7 @@ export const AdminUsers: React.FC = () => {
             Team Members Directory
           </h2>
           <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
-            View all employees, inspect completion rates, manage roles, and assign tasks
+            View all employees, inspect completion rates, manage roles, block/unblock, and remove users
           </p>
         </div>
 
@@ -122,7 +157,18 @@ export const AdminUsers: React.FC = () => {
           />
         </div>
 
-        <div className="w-full sm:w-60">
+        <div className="w-full sm:w-48">
+          <Select
+            value={selectedStatus}
+            onChange={(e) => setSelectedStatus(e.target.value as any)}
+          >
+            <option value="all">All Statuses</option>
+            <option value="active">Active Only</option>
+            <option value="blocked">Blocked / Deactivated</option>
+          </Select>
+        </div>
+
+        <div className="w-full sm:w-56">
           <Select
             value={selectedTeam}
             onChange={(e) => setSelectedTeam(e.target.value)}
@@ -143,25 +189,26 @@ export const AdminUsers: React.FC = () => {
           <thead className="bg-zinc-50/80 dark:bg-zinc-800/40 text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
             <tr>
               <th className="py-3 px-4 min-w-[200px]">Member</th>
-              <th className="py-3 px-4 min-w-[150px]">Department</th>
+              <th className="py-3 px-3 min-w-[100px]">Status</th>
+              <th className="py-3 px-4 min-w-[140px]">Department</th>
               <th className="py-3 px-4 min-w-[140px]">Designation</th>
               <th className="py-3 px-4 text-center min-w-[70px]">Tasks</th>
               <th className="py-3 px-4 text-center min-w-[80px]">Done</th>
               <th className="py-3 px-4 text-center min-w-[80px]">Pending</th>
               <th className="py-3 px-4 text-center min-w-[80px]">Overdue</th>
-              <th className="py-3 px-4 text-center min-w-[100px]">Rate</th>
-              <th className="py-3 px-4 min-w-[120px]">Last Active</th>
-              <th className="py-3 px-4 text-right min-w-[140px]">Actions</th>
+              <th className="py-3 px-4 text-center min-w-[90px]">Rate</th>
+              <th className="py-3 px-4 min-w-[110px]">Last Active</th>
+              <th className="py-3 px-4 text-right min-w-[160px]">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/60">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <TableRowSkeleton key={i} columns={10} />
+                <TableRowSkeleton key={i} columns={11} />
               ))
             ) : filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-10 text-center text-xs text-zinc-400">
+                <td colSpan={11} className="py-10 text-center text-xs text-zinc-400">
                   No team members matching your search criteria.
                 </td>
               </tr>
@@ -174,6 +221,8 @@ export const AdminUsers: React.FC = () => {
                   overdueTasks: 0,
                   completionRate: 0,
                 };
+
+                const isBlocked = member.isActive === false;
 
                 return (
                   <tr
@@ -207,6 +256,21 @@ export const AdminUsers: React.FC = () => {
                       </Link>
                     </td>
 
+                    {/* Status Badge */}
+                    <td className="py-3.5 px-3 whitespace-nowrap">
+                      {isBlocked ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 dark:bg-rose-950/80 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Blocked
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          Active
+                        </span>
+                      )}
+                    </td>
+
                     {/* Department */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       {member.team ? (
@@ -219,7 +283,7 @@ export const AdminUsers: React.FC = () => {
                     </td>
 
                     {/* Designation */}
-                    <td className="py-3.5 px-4 text-xs text-zinc-600 dark:text-zinc-300 truncate max-w-[150px]">
+                    <td className="py-3.5 px-4 text-xs text-zinc-600 dark:text-zinc-300 truncate max-w-[140px]">
                       {member.designation || '—'}
                     </td>
 
@@ -267,6 +331,28 @@ export const AdminUsers: React.FC = () => {
                           + Task
                         </button>
 
+                        {/* Block / Unblock Toggle */}
+                        <button
+                          onClick={() => setUserToBlock(member)}
+                          className={`p-1.5 rounded transition-colors ${
+                            isBlocked
+                              ? 'text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+                              : 'text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+                          }`}
+                          title={isBlocked ? 'Unblock User' : 'Block / Deactivate User'}
+                        >
+                          {isBlocked ? <UserCheck className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                        </button>
+
+                        {/* Delete User */}
+                        <button
+                          onClick={() => setUserToDelete(member)}
+                          className="p-1.5 text-zinc-400 hover:text-rose-600 rounded hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
+                          title="Remove / Delete User"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+
                         {/* Drill Down */}
                         <Link
                           to={`/admin/users/${member.uid}`}
@@ -306,6 +392,38 @@ export const AdminUsers: React.FC = () => {
           }?`}
           confirmText="Change Role"
           variant="primary"
+          loading={actionLoading}
+        />
+      )}
+
+      {/* Block/Unblock Confirmation Dialog */}
+      {userToBlock && (
+        <ConfirmDialog
+          isOpen={!!userToBlock}
+          onClose={() => setUserToBlock(null)}
+          onConfirm={handleBlockToggleConfirm}
+          title={userToBlock.isActive === false ? 'Unblock User' : 'Block / Deactivate User'}
+          message={
+            userToBlock.isActive === false
+              ? `Are you sure you want to unblock ${userToBlock.name}? They will regain access to their workspace.`
+              : `Are you sure you want to block ${userToBlock.name}? Their account will be immediately deactivated and denied workspace access.`
+          }
+          confirmText={userToBlock.isActive === false ? 'Unblock' : 'Block User'}
+          variant={userToBlock.isActive === false ? 'primary' : 'danger'}
+          loading={actionLoading}
+        />
+      )}
+
+      {/* Delete User Confirmation Dialog */}
+      {userToDelete && (
+        <ConfirmDialog
+          isOpen={!!userToDelete}
+          onClose={() => setUserToDelete(null)}
+          onConfirm={handleDeleteUserConfirm}
+          title="Remove User"
+          message={`Are you sure you want to permanently remove "${userToDelete.name}" (${userToDelete.email})? This action removes their profile from Firestore and cannot be undone.`}
+          confirmText="Delete User"
+          variant="danger"
           loading={actionLoading}
         />
       )}

@@ -3,6 +3,7 @@ import { Menu, Plus, User, Search } from 'lucide-react';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/Button';
 import { TaskModal } from '@/components/tasks/TaskModal';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useAuth } from '@/hooks/useAuth';
 import { useUsers } from '@/hooks/useUsers';
 import { Link } from 'react-router-dom';
@@ -34,7 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, title }) => 
         )}
       </div>
 
-      <div className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2">
         <Button
           size="sm"
           onClick={() => setIsTaskModalOpen(true)}
@@ -51,6 +52,8 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, title }) => 
         >
           <Plus className="w-4 h-4" />
         </button>
+
+        <ThemeToggle size="sm" />
 
         <NotificationBell />
 

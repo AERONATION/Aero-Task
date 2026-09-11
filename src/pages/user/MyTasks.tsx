@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTasks } from '@/hooks/useTasks';
+import { useUsers } from '@/hooks/useUsers';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskModal } from '@/components/tasks/TaskModal';
@@ -24,8 +25,9 @@ import {
 } from 'lucide-react';
 
 export const MyTasks: React.FC = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, isAdmin } = useAuth();
   const { tasks, allTasks, loading, filters, setFilters } = useTasks();
+  const { users, usersMap } = useUsers();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -51,7 +53,7 @@ export const MyTasks: React.FC = () => {
   };
 
   const handleConfirmDelete = async () => {
-    if (!taskToDelete || !user) return;
+    if (!taskToDelete || !user || !isAdmin) return;
     setActionLoading(true);
     try {
       await deleteTask(taskToDelete.id, user.uid, taskToDelete.title);
@@ -213,30 +215,42 @@ export const MyTasks: React.FC = () => {
           <div className="hidden md:block">
             <TaskTable
               tasks={tasks}
+              usersMap={usersMap}
               showAssignee={false}
               onStatusChange={handleStatusChange}
+              canEditTask={(t) => Boolean(user && (isAdmin || t.createdBy === user.uid || t.assignedBy === user.uid))}
               onEdit={(t) => {
                 setActiveTask(t);
                 setIsModalOpen(true);
               }}
-              onDelete={(t) => setTaskToDelete(t)}
+              onDelete={isAdmin ? (t) => setTaskToDelete(t) : undefined}
             />
           </div>
 
           {/* Mobile Cards */}
           <div className="md:hidden space-y-3">
-            {tasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onStatusChange={handleStatusChange}
-                onEdit={(t) => {
-                  setActiveTask(t);
-                  setIsModalOpen(true);
-                }}
-                onDelete={(t) => setTaskToDelete(t)}
-              />
-            ))}
+            {tasks.map((task) => {
+              const canEditThis = Boolean(
+                user && (isAdmin || task.createdBy === user.uid || task.assignedBy === user.uid)
+              );
+              return (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  usersMap={usersMap}
+                  onStatusChange={handleStatusChange}
+                  onEdit={
+                    canEditThis
+                      ? (t) => {
+                          setActiveTask(t);
+                          setIsModalOpen(true);
+                        }
+                      : undefined
+                  }
+                  onDelete={isAdmin ? (t) => setTaskToDelete(t) : undefined}
+                />
+              );
+            })}
           </div>
         </>
       )}
@@ -250,6 +264,7 @@ export const MyTasks: React.FC = () => {
             setActiveTask(null);
           }}
           task={activeTask}
+          users={users}
         />
       )}
 

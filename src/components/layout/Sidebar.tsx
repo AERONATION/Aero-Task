@@ -16,6 +16,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface SidebarProps {
   onCloseMobile?: () => void;
@@ -141,13 +142,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-md hover:bg-white dark:hover:bg-zinc-800 transition-colors"
-            title="Log Out"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            <ThemeToggle size="sm" />
+            <button
+              onClick={handleLogout}
+              className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-md hover:bg-white dark:hover:bg-zinc-800 transition-colors"
+              title="Log Out"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
     </aside>

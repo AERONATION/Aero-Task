@@ -279,9 +279,13 @@ export function calculateTeamPerformance(
     const memberUids = new Set(teamMembers.map((m) => m.uid));
 
     // Tasks belong to team either explicitly by task.team or by assigned member
-    const teamTasks = tasks.filter(
-      (t) => t.team === teamName || (t.assignedTo && memberUids.has(t.assignedTo))
-    );
+    const teamTasks = tasks.filter((t) => {
+      if (t.team === teamName) return true;
+      if (Array.isArray(t.assignedTo)) {
+        return t.assignedTo.some((uid) => memberUids.has(uid));
+      }
+      return t.assignedTo && memberUids.has(t.assignedTo);
+    });
 
     const metrics = calculatePerformanceMetrics(teamTasks);
 
