@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isUser(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+    
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getUserData().systemRole == 'admin';
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Any authenticated user can read basic user profile information (needed for assignee names, team views)
+      allow read: if isAuthenticated();
+      
+      // User can create their own profile during registration/onboarding, but systemRole MUST be 'user'
+      // Admins can create profiles with any role
+      allow create: if isAuthenticated() && (
+        (isUser(userId) && request.resource.data.systemRole == 'user') ||
+        isAdmin()
+      );
+      
+      // User can update their own profile, but CANNOT modify systemRole
+      // Admin can update any profile, including systemRole
+      allow update: if isAuthenticated() && (
+        (isUser(userId) && request.resource.data.systemRole == resource.data.systemRole) ||
+        isAdmin()
+      );
+      
+      // Only admins can delete user documents
+      allow delete: if isAdmin();
+    }
+
+    // Tasks collection
+    match /tasks/{taskId} {
+      // Normal user can read tasks assigned to them or created by them. Admins can read all tasks.
+      allow read: if isAuthenticated() && (
+        resource.data.assignedTo == request.auth.uid ||
+        resource.data.createdBy == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Normal user can create a task if createdBy is their own UID
+      // Admin can create tasks for anyone
+      allow create: if isAuthenticated() && (
+        (request.resource.data.createdBy == request.auth.uid && request.resource.data.assignedTo == request.auth.uid) ||
+        isAdmin()
+      );
+      
+      // Normal user can update task if assigned to them or created by them (e.g. status change, edit own task)
+      // Admin can update any task
+      allow update: if isAuthenticated() && (
+        resource.data.assignedTo == request.auth.uid ||
+        resource.data.createdBy == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Creator can delete their task, or admin can delete any task
+      allow delete: if isAuthenticated() && (
+        resource.data.createdBy == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Activity Logs collection
+    match /activityLogs/{logId} {
+      // Admins can read all activity logs; users can read logs where they are the actor or for their tasks
+      allow read: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Authenticated users can create activity logs with their own userId
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+      
+      // Activity logs are immutable
+      allow update, delete: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can only read their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users or system can create notifications for any user (e.g. task assignment notification)
+      allow create: if isAuthenticated();
+      
+      // Users can update their own notifications (e.g. mark as read)
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users can delete their own notifications, admins can delete any
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+  }
+}
