@@ -193,8 +193,15 @@ export const TaskDetail: React.FC = () => {
   const isAssigner = Boolean(
     user && (isAdmin || task.createdBy === user.uid || task.assignedBy === user.uid)
   );
+  const isAssignee = Boolean(
+    user && (
+      (Array.isArray(task.assignedTo) && task.assignedTo.includes(user.uid)) ||
+      (task.assignedTo as any) === user.uid
+    )
+  );
   const canEdit = isAssigner;
   const canDelete = isAdmin;
+  const canToggleChecklist = Boolean(user && (isAdmin || isAssigner || isAssignee));
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 text-left">
@@ -383,7 +390,7 @@ export const TaskDetail: React.FC = () => {
         items={task.checklist || []}
         onToggleItem={handleToggleChecklistItem}
         onUpdateItems={isAdmin ? handleUpdateChecklistStructure : undefined}
-        readOnly={!canEdit}
+        readOnly={!canToggleChecklist}
         canEditStructure={isAdmin}
         title="API Testing Checklist & Endpoints"
         description="Verify endpoints, toggle completion status, and monitor team progress in real time"
