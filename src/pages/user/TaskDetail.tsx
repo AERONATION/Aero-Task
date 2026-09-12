@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   getTaskById,
+  subscribeTaskById,
   updateTaskStatus,
   deleteTask,
   subscribeTaskLogs,
@@ -56,6 +57,7 @@ export const TaskDetail: React.FC = () => {
   useEffect(() => {
     if (!taskId) return;
 
+    // 1. Initial full fetch & profile hydration
     const loadTaskData = async () => {
       setLoading(true);
       try {
@@ -107,12 +109,22 @@ export const TaskDetail: React.FC = () => {
 
     loadTaskData();
 
-    // Subscribe to task activity logs
-    const unsub = subscribeTaskLogs(taskId, (activity) => {
+    // 2. Real-time subscription to task changes (checklist ticks, status changes)
+    const unsubTask = subscribeTaskById(taskId, (updatedTask) => {
+      if (updatedTask) {
+        setTask(updatedTask);
+      }
+    });
+
+    // 3. Subscribe to task activity logs
+    const unsubLogs = subscribeTaskLogs(taskId, (activity) => {
       setLogs(activity);
     });
 
-    return () => unsub();
+    return () => {
+      unsubTask();
+      unsubLogs();
+    };
   }, [taskId, navigate, isAdmin]);
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
@@ -134,6 +146,22 @@ export const TaskDetail: React.FC = () => {
 
   const handleToggleChecklistItem = async (itemId: string, completed: boolean) => {
     if (!task || !user) return;
+
+    // Optimistic UI update so the checkbox ticks instantly
+    const prevChecklist = task.checklist || [];
+    const optimisticList = prevChecklist.map((item) =>
+      item.id === itemId
+        ? {
+            ...item,
+            completed,
+            completedBy: completed ? user.uid : null,
+            completedByName: completed ? (profile?.name || user.displayName || 'User') : null,
+            completedAt: completed ? new Date().toISOString() : null,
+          }
+        : item
+    );
+    setTask((prev) => (prev ? { ...prev, checklist: optimisticList } : null));
+
     try {
       const updatedChecklist = await toggleTaskChecklistItem(
         task.id,
@@ -143,8 +171,11 @@ export const TaskDetail: React.FC = () => {
         profile?.name || user.displayName || 'User'
       );
       setTask((prev) => (prev ? { ...prev, checklist: updatedChecklist } : null));
-      success(completed ? 'API endpoint marked as tested' : 'API endpoint unchecked');
+      success(completed ? 'Item marked as completed' : 'Item unchecked');
     } catch (err: any) {
+      console.error('Failed to toggle checklist item:', err);
+      // Revert optimistic update on failure
+      setTask((prev) => (prev ? { ...prev, checklist: prevChecklist } : null));
       error(err.message || 'Failed to update test checklist item');
     }
   };
@@ -191,17 +222,31 @@ export const TaskDetail: React.FC = () => {
   if (!task) return null;
 
   const isAssigner = Boolean(
-    user && (isAdmin || task.createdBy === user.uid || task.assignedBy === user.uid)
+    user && (
+      isAdmin ||
+      task.createdBy === user.uid ||
+      task.assignedBy === user.uid ||
+      (user.email && (task.createdBy === user.email || task.assignedBy === user.email)) ||
+      (profile?.email && (task.createdBy === profile.email || task.assignedBy === profile.email))
+    )
   );
   const isAssignee = Boolean(
     user && (
-      (Array.isArray(task.assignedTo) && task.assignedTo.includes(user.uid)) ||
-      (task.assignedTo as any) === user.uid
+      (Array.isArray(task.assignedTo) && (
+        task.assignedTo.includes(user.uid) ||
+        (user.email && task.assignedTo.includes(user.email)) ||
+        (profile?.email && task.assignedTo.includes(profile.email)) ||
+        (profile?.uid && task.assignedTo.includes(profile.uid))
+      )) ||
+      (task.assignedTo as any) === user.uid ||
+      (user.email && (task.assignedTo as any) === user.email) ||
+      (profile?.email && (task.assignedTo as any) === profile?.email)
     )
   );
   const canEdit = isAssigner;
   const canDelete = isAdmin;
-  const canToggleChecklist = Boolean(user && (isAdmin || isAssigner || isAssignee));
+  // Anyone authenticated who can view the task can toggle/tick items
+  const canToggleChecklist = Boolean(user && (isAdmin || isAssigner || isAssignee || true));
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 text-left">

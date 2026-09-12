@@ -35,13 +35,13 @@ export interface CreateTaskInput {
  */
 export function sanitizeChecklist(items?: ChecklistItem[]): ChecklistItem[] {
   if (!Array.isArray(items)) return [];
-  return items.map((item) => ({
-    id: item.id || ('chk_' + Math.random().toString(36).substring(2, 9)),
-    title: String(item.title || 'API Item').trim(),
+  return items.map((item, idx) => ({
+    id: item.id || `chk_${idx}_${String(item.title || item.endpoint || 'item').replace(/[^a-zA-Z0-9_]/g, '')}`,
+    title: String(item.title || item.endpoint || (item as any).name || 'Todo Item').trim(),
     method: String(item.method || 'GET').trim().toUpperCase(),
     endpoint: String(item.endpoint || '').trim(),
     description: String(item.description || '').trim(),
-    completed: Boolean(item.completed),
+    completed: Boolean(item.completed || (item as any).done || (item as any).status === 'completed'),
     completedBy: item.completedBy || null,
     completedByName: item.completedByName || null,
     completedAt: item.completedAt || null,
@@ -166,8 +166,14 @@ export async function toggleTaskChecklistItem(
   const currentChecklist: ChecklistItem[] = sanitizeChecklist(taskData.checklist);
 
   let toggledTitle = '';
-  const updatedChecklist = currentChecklist.map((item) => {
-    if (item.id === itemId) {
+  const updatedChecklist = currentChecklist.map((item, idx) => {
+    const isTarget =
+      item.id === itemId ||
+      `chk_${idx}` === itemId ||
+      `chk_${idx}_${String(item.title || item.endpoint || 'item').replace(/[^a-zA-Z0-9_]/g, '')}` === itemId ||
+      item.title === itemId;
+
+    if (isTarget) {
       toggledTitle = item.title;
       return {
         ...item,
@@ -189,7 +195,7 @@ export async function toggleTaskChecklistItem(
 
   await logActivity(actorUid, taskId, 'checklist_item_toggled', {
     itemId,
-    itemTitle: toggledTitle,
+    itemTitle: toggledTitle || itemId,
     completed,
     actorName,
     progress: `${completedCount}/${updatedChecklist.length}`,
@@ -378,6 +384,32 @@ export async function getTaskById(taskId: string): Promise<Task | null> {
   const snap = await getDoc(taskRef);
   if (!snap.exists()) return null;
   return normalizeTaskData(snap.id, snap.data());
+}
+
+/**
+ * Subscribes to a single task by ID in real-time
+ */
+export function subscribeTaskById(
+  taskId: string,
+  callback: (task: Task | null) => void,
+  onError?: (err: Error) => void
+) {
+  if (!taskId) return () => {};
+  const taskRef = doc(db, 'tasks', taskId);
+  return onSnapshot(
+    taskRef,
+    (snap) => {
+      if (!snap.exists()) {
+        callback(null);
+      } else {
+        callback(normalizeTaskData(snap.id, snap.data()));
+      }
+    },
+    (err) => {
+      console.warn('Error subscribing to task doc:', err);
+      if (onError) onError(err);
+    }
+  );
 }
 
 /**
