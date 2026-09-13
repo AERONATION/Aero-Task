@@ -5,6 +5,7 @@ import { useUsers } from '@/hooks/useUsers';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskModal } from '@/components/tasks/TaskModal';
+import { ReminderModal } from '@/components/tasks/ReminderModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { TableRowSkeleton } from '@/components/ui/Skeleton';
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Task, TaskPriority, TaskStatus } from '@/types/task';
+import { UserProfile } from '@/types/user';
 import { updateTaskStatus, deleteTask } from '@/services/taskService';
 import { useToast } from '@/context/ToastContext';
 import {
@@ -31,6 +33,7 @@ export const MyTasks: React.FC = () => {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [taskToRemind, setTaskToRemind] = useState<Task | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const { success, error } = useToast();
 
@@ -219,6 +222,7 @@ export const MyTasks: React.FC = () => {
               showAssignee={false}
               onStatusChange={handleStatusChange}
               canEditTask={(t) => Boolean(user && (isAdmin || t.createdBy === user.uid || t.assignedBy === user.uid))}
+              onRemind={(t) => setTaskToRemind(t)}
               onEdit={(t) => {
                 setActiveTask(t);
                 setIsModalOpen(true);
@@ -239,6 +243,7 @@ export const MyTasks: React.FC = () => {
                   task={task}
                   usersMap={usersMap}
                   onStatusChange={handleStatusChange}
+                  onRemind={(t) => setTaskToRemind(t)}
                   onEdit={
                     canEditThis
                       ? (t) => {
@@ -253,6 +258,20 @@ export const MyTasks: React.FC = () => {
             })}
           </div>
         </>
+      )}
+
+      {/* Reminder Modal */}
+      {taskToRemind && (
+        <ReminderModal
+          isOpen={!!taskToRemind}
+          onClose={() => setTaskToRemind(null)}
+          task={taskToRemind}
+          assignees={
+            (Array.isArray(taskToRemind.assignedTo) ? taskToRemind.assignedTo : [taskToRemind.assignedTo])
+              .map((uid) => usersMap.get(uid))
+              .filter(Boolean) as UserProfile[]
+          }
+        />
       )}
 
       {/* Task Create/Edit Modal */}

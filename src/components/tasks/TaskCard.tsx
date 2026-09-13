@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Code2,
   Users,
+  Bell,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -25,6 +26,7 @@ interface TaskCardProps {
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onRemind?: (task: Task) => void;
   detailUrlPrefix?: string;
 }
 
@@ -36,6 +38,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   onStatusChange,
   onEdit,
   onDelete,
+  onRemind,
   detailUrlPrefix = '/user/tasks',
 }) => {
   // Normalize assignees list
@@ -69,6 +72,15 @@ export const TaskCard: React.FC<TaskCardProps> = ({
           )}
         </div>
         <div className="flex items-center gap-1">
+          {onRemind && task.status !== 'completed' && (
+            <button
+              onClick={() => onRemind(task)}
+              className="p-1.5 text-zinc-400 hover:text-amber-500 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              title="Send Reminder Email & Alert"
+            >
+              <Bell className="w-3.5 h-3.5" />
+            </button>
+          )}
           {onEdit && (
             <button
               onClick={() => onEdit(task)}

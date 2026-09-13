@@ -5,13 +5,14 @@ import { useAuth } from '@/hooks/useAuth';
 import { TaskTable } from '@/components/tasks/TaskTable';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskModal } from '@/components/tasks/TaskModal';
+import { ReminderModal } from '@/components/tasks/ReminderModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Task, TaskPriority, TaskStatus } from '@/types/task';
-import { TEAMS } from '@/types/user';
+import { TEAMS, UserProfile } from '@/types/user';
 import { updateTaskStatus, deleteTask } from '@/services/taskService';
 import { useToast } from '@/context/ToastContext';
 import { Plus, Search, Filter, RotateCcw } from 'lucide-react';
@@ -23,6 +24,7 @@ export const AdminTasks: React.FC = () => {
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [taskToRemind, setTaskToRemind] = useState<Task | null>(null);
   const { success, error } = useToast();
 
   const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
@@ -236,6 +238,7 @@ export const AdminTasks: React.FC = () => {
               usersMap={usersMap}
               showAssignee={true}
               onStatusChange={handleStatusChange}
+              onRemind={(t) => setTaskToRemind(t)}
               onEdit={(t) => {
                 setActiveTask(t);
                 setIsModalOpen(true);
@@ -251,6 +254,7 @@ export const AdminTasks: React.FC = () => {
                 task={task}
                 usersMap={usersMap}
                 onStatusChange={handleStatusChange}
+                onRemind={(t) => setTaskToRemind(t)}
                 onEdit={(t) => {
                   setActiveTask(t);
                   setIsModalOpen(true);
@@ -260,6 +264,20 @@ export const AdminTasks: React.FC = () => {
             ))}
           </div>
         </>
+      )}
+
+      {/* Reminder Modal */}
+      {taskToRemind && (
+        <ReminderModal
+          isOpen={!!taskToRemind}
+          onClose={() => setTaskToRemind(null)}
+          task={taskToRemind}
+          assignees={
+            (Array.isArray(taskToRemind.assignedTo) ? taskToRemind.assignedTo : [taskToRemind.assignedTo])
+              .map((uid) => usersMap.get(uid))
+              .filter(Boolean) as UserProfile[]
+          }
+        />
       )}
 
       {/* Create / Edit Modal with User Assignment */}

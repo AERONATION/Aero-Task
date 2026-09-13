@@ -18,6 +18,7 @@ import { DeadlineBadge } from '@/components/tasks/DeadlineBadge';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { TaskModal } from '@/components/tasks/TaskModal';
+import { ReminderModal } from '@/components/tasks/ReminderModal';
 import { ApiChecklist } from '@/components/tasks/ApiChecklist';
 import { formatDate, formatRelativeDate } from '@/utils/date';
 import { useToast } from '@/context/ToastContext';
@@ -35,6 +36,8 @@ import {
   History,
   AlertOctagon,
   Code2,
+  Bell,
+  Mail,
 } from 'lucide-react';
 
 export const TaskDetail: React.FC = () => {
@@ -51,6 +54,7 @@ export const TaskDetail: React.FC = () => {
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -261,6 +265,18 @@ export const TaskDetail: React.FC = () => {
         </Link>
 
         <div className="flex items-center gap-2">
+          {task.status !== 'completed' && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Bell className="w-3.5 h-3.5 text-amber-500" />}
+              onClick={() => setIsReminderModalOpen(true)}
+              className="hover:border-amber-500/50 hover:bg-amber-500/10 dark:hover:bg-amber-500/10 text-zinc-700 dark:text-zinc-200"
+            >
+              Send Reminder
+            </Button>
+          )}
+
           {canEdit && (
             <Button
               variant="outline"
@@ -318,13 +334,19 @@ export const TaskDetail: React.FC = () => {
 
         {/* Quick Action State Switcher */}
         <div className="p-3.5 rounded-lg bg-zinc-100/70 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/60 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-            Task Progression:
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-300">
+              Current Progress:
+            </span>
+            <span className="text-xs font-mono uppercase font-bold text-zinc-900 dark:text-white">
+              {task.status.replace('_', ' ')}
+            </span>
+          </div>
+
           <div className="flex items-center gap-2">
             {task.status !== 'in_progress' && task.status !== 'completed' && (
               <Button
-                variant="secondary"
+                variant="outline"
                 size="sm"
                 icon={<Clock className="w-3.5 h-3.5 text-amber-500" />}
                 onClick={() => handleStatusChange('in_progress')}
@@ -335,11 +357,13 @@ export const TaskDetail: React.FC = () => {
 
             {task.status !== 'completed' && (
               <Button
+                variant="primary"
                 size="sm"
                 icon={<CheckCircle2 className="w-3.5 h-3.5" />}
                 onClick={() => handleStatusChange('completed')}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                Mark Completed
+                Mark Complete
               </Button>
             )}
 
@@ -347,7 +371,7 @@ export const TaskDetail: React.FC = () => {
               <Button
                 variant="outline"
                 size="sm"
-                icon={<RotateCcw className="w-3.5 h-3.5" />}
+                icon={<RotateCcw className="w-3.5 h-3.5 text-zinc-500" />}
                 onClick={() => handleStatusChange('todo')}
               >
                 Reopen Task
@@ -356,27 +380,26 @@ export const TaskDetail: React.FC = () => {
           </div>
         </div>
 
-        {/* Metadata Details Grid with Multiple Assignees & Assigner Designation */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs">
-          {/* Multiple Assignees Display */}
-          <div>
-            <span className="text-zinc-400 block mb-1 font-medium">
-              Assigned To ({assignees.length || task.assignedTo?.length || 0})
+        {/* Task Metadata Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+          {/* Multiple Assignees List */}
+          <div className="col-span-2 sm:col-span-1">
+            <span className="text-zinc-400 block mb-1 font-medium flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              <span>Assigned To ({assignees.length || 1})</span>
             </span>
             {assignees.length === 0 ? (
-              <span className="font-medium text-zinc-400">Unassigned</span>
+              <span className="font-medium text-zinc-800 dark:text-zinc-200">
+                {creator?.name || 'Unassigned'}
+              </span>
             ) : (
-              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <div className="space-y-1.5 mt-1">
                 {assignees.map((a) => (
-                  <div
-                    key={a.uid}
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-medium text-[11px]"
-                    title={`${a.name} (${a.designation || a.team || a.email})`}
-                  >
-                    <div className="w-4 h-4 rounded-full bg-brand-200 dark:bg-brand-900 text-brand-700 dark:text-brand-300 font-bold text-[9px] flex items-center justify-center">
+                  <div key={a.uid} className="flex items-center gap-1.5 text-zinc-800 dark:text-zinc-200">
+                    <div className="w-5 h-5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 font-bold text-[10px] flex items-center justify-center shrink-0">
                       {a.name?.charAt(0).toUpperCase() || 'U'}
                     </div>
-                    <div className="flex flex-col min-w-0">
+                    <div className="min-w-0 flex flex-col">
                       <span className="truncate max-w-[110px] leading-tight">{a.name}</span>
                       {(a.designation || a.team) && (
                         <span className="text-[9px] text-zinc-400 font-mono truncate max-w-[110px]">
@@ -419,6 +442,17 @@ export const TaskDetail: React.FC = () => {
             <span className="font-medium text-zinc-800 dark:text-zinc-200">
               {formatDate(task.createdAt, true)}
             </span>
+            {task.lastRemindedAt && (
+              <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                <span className="text-zinc-400 block mb-0.5 font-medium flex items-center gap-1 text-[11px]">
+                  <Bell className="w-3 h-3 text-amber-500" />
+                  <span>Last Reminded</span>
+                </span>
+                <span className="font-medium text-amber-600 dark:text-amber-400 text-[11px]">
+                  {formatRelativeDate(task.lastRemindedAt)}
+                </span>
+              </div>
+            )}
           </div>
 
           <div>
@@ -456,21 +490,37 @@ export const TaskDetail: React.FC = () => {
           <div className="relative pl-6 space-y-4 before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-zinc-200 dark:before:bg-zinc-800">
             {logs.map((log) => (
               <div key={log.id} className="relative text-xs">
-                <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-brand-500 ring-4 ring-white dark:ring-zinc-900" />
+                <div className={`absolute -left-6 top-1 w-2.5 h-2.5 rounded-full ring-4 ring-white dark:ring-zinc-900 ${
+                  log.action === 'reminder_sent' ? 'bg-amber-500' : 'bg-brand-500'
+                }`} />
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                    {log.action.replace('task_', '').replace('checklist_', 'API: ').replace('_', ' ').toUpperCase()}
+                    {log.action === 'reminder_sent'
+                      ? 'REMINDER SENT'
+                      : log.action.replace('task_', '').replace('checklist_', 'API: ').replace('_', ' ').toUpperCase()}
                   </span>
                   <span className="text-[11px] text-zinc-400 font-mono">
                     {formatRelativeDate(log.timestamp)}
                   </span>
                 </div>
+                {log.action === 'reminder_sent' && (
+                  <div className="mt-0.5 text-[11px] text-amber-600 dark:text-amber-400">
+                    <p>
+                      📧 Email & in-app reminder sent by {log.metadata?.senderName || 'Teammate'} to {log.metadata?.recipientCount || 'all'} assignee(s)
+                    </p>
+                    {log.metadata?.reminderNote && (
+                      <p className="text-zinc-500 dark:text-zinc-400 italic mt-0.5">
+                        "{log.metadata.reminderNote}"
+                      </p>
+                    )}
+                  </div>
+                )}
                 {log.metadata?.itemTitle && (
                   <p className="text-zinc-600 dark:text-zinc-300 font-mono text-[11px] mt-0.5">
                     {log.metadata.itemTitle} - {log.metadata.completed ? 'COMPLETED' : 'UNCHECKED'} ({log.metadata.progress})
                   </p>
                 )}
-                {log.metadata?.actorName && (
+                {log.metadata?.actorName && log.action !== 'reminder_sent' && (
                   <p className="text-zinc-500 dark:text-zinc-400 mt-0.5">
                     Triggered by {log.metadata.actorName}
                   </p>
@@ -480,6 +530,22 @@ export const TaskDetail: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Reminder Modal */}
+      {isReminderModalOpen && (
+        <ReminderModal
+          isOpen={isReminderModalOpen}
+          onClose={() => setIsReminderModalOpen(false)}
+          task={task}
+          assignees={assignees}
+          onSuccess={async () => {
+            if (taskId) {
+              const updated = await getTaskById(taskId);
+              if (updated) setTask(updated);
+            }
+          }}
+        />
+      )}
 
       {/* Edit Modal */}
       {isEditModalOpen && (

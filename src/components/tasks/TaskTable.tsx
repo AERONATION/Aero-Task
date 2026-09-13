@@ -13,6 +13,7 @@ import {
   ExternalLink,
   User as UserIcon,
   Code2,
+  Bell,
 } from 'lucide-react';
 
 interface TaskTableProps {
@@ -21,6 +22,7 @@ interface TaskTableProps {
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void;
   onEdit?: (task: Task) => void;
   onDelete?: (task: Task) => void;
+  onRemind?: (task: Task) => void;
   canEditTask?: (task: Task) => boolean;
   detailUrlPrefix?: string;
   showAssignee?: boolean;
@@ -32,6 +34,7 @@ export const TaskTable: React.FC<TaskTableProps> = ({
   onStatusChange,
   onEdit,
   onDelete,
+  onRemind,
   canEditTask,
   detailUrlPrefix = '/user/tasks',
   showAssignee = true,
@@ -212,6 +215,15 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                 {/* Actions */}
                 <td className="py-3.5 px-4 text-right whitespace-nowrap">
                   <div className="flex items-center justify-end gap-1">
+                    {onRemind && task.status !== 'completed' && (
+                      <button
+                        onClick={() => onRemind(task)}
+                        className="p-1.5 text-zinc-400 hover:text-amber-500 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                        title="Send Reminder Email & Alert"
+                      >
+                        <Bell className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     {onEdit && (!canEditTask || canEditTask(task)) && (
                       <button
                         onClick={() => onEdit(task)}

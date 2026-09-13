@@ -15,6 +15,9 @@ import {
 import { db, tasksCol, activityLogsCol } from '@/firebase/firestore';
 import { Task, TaskPriority, TaskStatus, ActivityAction, ActivityLog, ChecklistItem } from '@/types/task';
 import { createNotification } from './notificationService';
+import { getUserProfile } from './userService';
+import { sendTaskAssignedEmail, sendTaskReminderEmail } from './emailService';
+import { UserProfile } from '@/types/user';
 
 export interface CreateTaskInput {
   title: string;
@@ -144,6 +147,36 @@ export async function createTask(input: CreateTaskInput): Promise<string> {
       );
     }
   }
+
+  // Trigger email notifications for assignees asynchronously
+  (async () => {
+    try {
+      const assigneesToEmail = taskData.assignedTo.filter((uid) => uid && uid !== input.createdBy);
+      // If task is assigned only to creator, still email if desired or skip
+      const targetUids = assigneesToEmail.length > 0 ? assigneesToEmail : taskData.assignedTo.filter(Boolean);
+      if (targetUids.length > 0) {
+        const profiles = await Promise.all(targetUids.map((uid) => getUserProfile(uid)));
+        const validProfiles = profiles.filter(Boolean) as UserProfile[];
+        if (validProfiles.length > 0) {
+          await sendTaskAssignedEmail({
+            task: {
+              id: taskId,
+              title: taskData.title,
+              description: taskData.description,
+              priority: taskData.priority,
+              deadline: taskData.deadline,
+              team: taskData.team,
+              checklist: taskData.checklist,
+            },
+            assignees: validProfiles,
+            assignerName: input.creatorName || 'A teammate',
+          });
+        }
+      }
+    } catch (mailErr) {
+      console.warn('Failed to send task assignment email:', mailErr);
+    }
+  })();
 
   return taskId;
 }
@@ -585,3 +618,80 @@ export function subscribeRecentActivity(
     }
   );
 }
+
+/**
+ * Manually sends an email and in-app reminder to assignees of a task
+ */
+export async function sendTaskReminder(
+  taskId: string,
+  senderUid: string,
+  senderName: string,
+  reminderNote?: string
+): Promise<{ success: boolean; sentCount: number; error?: string }> {
+  try {
+    const taskRef = doc(db, 'tasks', taskId);
+    const snap = await getDoc(taskRef);
+    if (!snap.exists()) {
+      return { success: false, sentCount: 0, error: 'Task not found' };
+    }
+
+    const task = normalizeTaskData(snap.id, snap.data());
+    const assigneeUids = task.assignedTo.filter((uid) => uid && uid !== senderUid);
+    const targetUids = assigneeUids.length > 0 ? assigneeUids : task.assignedTo.filter(Boolean);
+
+    if (targetUids.length === 0) {
+      return { success: false, sentCount: 0, error: 'No assignees found to remind for this task' };
+    }
+
+    const profiles = await Promise.all(targetUids.map((uid) => getUserProfile(uid)));
+    const validProfiles = profiles.filter(Boolean) as UserProfile[];
+
+    if (validProfiles.length === 0) {
+      return { success: false, sentCount: 0, error: 'Assignee profile emails not found' };
+    }
+
+    // Send email via Resend
+    const emailResult = await sendTaskReminderEmail({
+      task,
+      assignees: validProfiles,
+      senderName,
+      reminderNote,
+    });
+
+    // Send In-App Notifications
+    for (const uid of targetUids) {
+      await createNotification(
+        uid,
+        'task_reminder',
+        `Task Reminder: ${task.title}`,
+        reminderNote
+          ? `${senderName} sent a reminder: "${reminderNote}"`
+          : `${senderName} reminded you about the pending task "${task.title}"`,
+        taskId
+      );
+    }
+
+    // Update task with lastRemindedAt timestamp
+    await updateDoc(taskRef, {
+      lastRemindedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    // Log the reminder in activity history
+    await logActivity(senderUid, taskId, 'reminder_sent', {
+      senderName,
+      recipientCount: validProfiles.length,
+      reminderNote: reminderNote || '',
+    });
+
+    return {
+      success: emailResult.success || true,
+      sentCount: validProfiles.length,
+      error: emailResult.errors?.[0],
+    };
+  } catch (err: any) {
+    console.error('Failed to send task reminder:', err);
+    return { success: false, sentCount: 0, error: err.message || 'Failed to send reminder' };
+  }
+}
+

@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type NotificationType = 'task_assigned' | 'deadline_soon' | 'task_completed' | 'system';
+export type NotificationType = 'task_assigned' | 'deadline_soon' | 'task_completed' | 'task_reminder' | 'system';
 
 export interface AppNotification {
   id: string;

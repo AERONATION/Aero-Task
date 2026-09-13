@@ -36,6 +36,8 @@ export const NotificationBell: React.FC = () => {
         return <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />;
       case 'deadline_soon':
         return <Clock className="w-3.5 h-3.5 text-amber-500" />;
+      case 'task_reminder':
+        return <Bell className="w-3.5 h-3.5 text-amber-500" />;
       default:
         return <Info className="w-3.5 h-3.5 text-zinc-400" />;
     }

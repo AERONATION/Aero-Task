@@ -32,6 +32,7 @@ export interface Task {
   completedAt?: Timestamp | null | any;
   startedAt?: Timestamp | null | any;
   checklist?: ChecklistItem[];  // Array of API / Todo test items
+  lastRemindedAt?: Timestamp | null | any;
 }
 
 export type ActivityAction =
@@ -42,7 +43,8 @@ export type ActivityAction =
   | 'task_reopened'
   | 'task_assigned'
   | 'checklist_updated'
-  | 'checklist_item_toggled';
+  | 'checklist_item_toggled'
+  | 'reminder_sent';
 
 export interface ActivityLog {
   id: string;
