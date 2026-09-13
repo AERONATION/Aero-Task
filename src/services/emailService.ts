@@ -157,18 +157,19 @@ export async function sendTaskAssignedEmail(options: {
   let checklistHtml = '';
   if (checklistCount > 0) {
     checklistHtml = `
-      <div style="margin-top: 16px; padding: 12px; background-color: #27272a; border-radius: 8px; border: 1px solid #3f3f46;">
-        <p style="margin: 0 0 8px 0; font-size: 12px; font-weight: 600; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.5px;">
-          Includes API / Verification Checklist (${checklistCount} item${checklistCount > 1 ? 's' : ''})
+      <div style="margin-top: 16px; padding: 14px; background-color: #27272a; border-radius: 8px; border: 1px solid #3f3f46;">
+        <p style="margin: 0 0 10px 0; font-size: 12px; font-weight: 700; color: #a1a1aa; text-transform: uppercase; letter-spacing: 0.5px;">
+          📋 Actionable To-Do & Checklist (${checklistCount} item${checklistCount > 1 ? 's' : ''})
         </p>
         <ul style="margin: 0; padding-left: 20px; font-size: 13px; color: #e4e4e7;">
-          ${task.checklist!.slice(0, 4).map((item) => `
-            <li style="margin-bottom: 4px;">
-              ${item.method ? `<span style="font-size: 10px; font-weight: bold; background-color: #3b82f6; color: #fff; padding: 1px 4px; border-radius: 3px; margin-right: 4px;">${item.method}</span>` : ''}
+          ${task.checklist!.slice(0, 5).map((item) => `
+            <li style="margin-bottom: 6px;">
+              ${item.method ? `<span style="font-size: 10px; font-weight: bold; background-color: #3b82f6; color: #fff; padding: 1px 5px; border-radius: 3px; margin-right: 6px;">${item.method}</span>` : '<span style="color: #60a5fa; margin-right: 4px;">☑</span>'}
               <strong>${item.title || item.endpoint || 'Item'}</strong>
+              ${item.endpoint && item.title && item.title !== item.endpoint ? `<span style="color: #a1a1aa; font-family: monospace; font-size: 11px; margin-left: 4px;">(${item.endpoint})</span>` : ''}
             </li>
           `).join('')}
-          ${checklistCount > 4 ? `<li style="color: #a1a1aa; list-style-type: none; margin-top: 4px;">+ ${checklistCount - 4} more test items...</li>` : ''}
+          ${checklistCount > 5 ? `<li style="color: #a1a1aa; list-style-type: none; margin-top: 6px;">+ ${checklistCount - 5} more to-do items...</li>` : ''}
         </ul>
       </div>
     `;

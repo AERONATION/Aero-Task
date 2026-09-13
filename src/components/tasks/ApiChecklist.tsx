@@ -394,7 +394,7 @@ export const ApiChecklist: React.FC<ApiChecklistProps> = ({
 
                       {item.title && item.title !== item.endpoint && (
                         <span className={cn(
-                          'text-xs font-medium text-zinc-700 dark:text-zinc-300',
+                          item.endpoint ? 'text-xs font-medium text-zinc-700 dark:text-zinc-300' : 'text-xs font-semibold text-zinc-900 dark:text-zinc-100',
                           item.completed && 'line-through text-zinc-400 dark:text-zinc-500'
                         )}>
                           {item.title}
