@@ -62,7 +62,7 @@ export const ReminderModal: React.FC<ReminderModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Send Task Reminder" size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title="Send Task Reminder" maxWidth="md">
       <div className="space-y-4 text-left">
         {/* Banner */}
         <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 flex items-start gap-3">

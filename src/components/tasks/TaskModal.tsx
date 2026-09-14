@@ -389,6 +389,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                         email: user.email || '',
                         systemRole: profile?.systemRole || 'user',
                         team: profile?.team,
+                        isActive: true,
                         createdAt: new Date(),
                         updatedAt: new Date(),
                         lastLoginAt: new Date(),

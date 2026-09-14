@@ -23,6 +23,7 @@ export const AppLayout: React.FC = () => {
     if (path.includes('/admin/tasks')) return 'All Tasks Directory';
     if (path.includes('/admin/teams')) return 'Department Performance';
     if (path.includes('/admin/analytics')) return 'Organization Analytics';
+    if (path.includes('/admin/workload')) return 'Workforce Capacity';
     if (path.includes('/admin/settings')) return 'System Settings';
     return 'AeroTask';
   };

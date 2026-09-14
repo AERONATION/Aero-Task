@@ -29,6 +29,7 @@ import { AdminTasks } from '@/pages/admin/AdminTasks';
 import { AdminTeams } from '@/pages/admin/AdminTeams';
 import { AdminAnalytics } from '@/pages/admin/AdminAnalytics';
 import { AdminSettings } from '@/pages/admin/AdminSettings';
+import { AdminWorkload } from '@/pages/admin/AdminWorkload';
 
 const RootRedirect: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -92,6 +93,7 @@ export const App: React.FC = () => {
                 <Route path="tasks" element={<AdminTasks />} />
                 <Route path="teams" element={<AdminTeams />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
+                <Route path="workload" element={<AdminWorkload />} />
                 <Route path="settings" element={<AdminSettings />} />
               </Route>
 

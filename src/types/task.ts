@@ -11,8 +11,8 @@ export interface ChecklistItem {
   endpoint?: string;        // e.g. '/api/v1/users'
   description?: string;
   completed: boolean;
-  completedBy?: string;     // UID of user who marked it complete
-  completedByName?: string; // Display name
+  completedBy?: string | null;     // UID of user who marked it complete
+  completedByName?: string | null;  // Display name
   completedAt?: Timestamp | string | null | any;
 }
 

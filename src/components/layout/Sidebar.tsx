@@ -14,6 +14,7 @@ import {
   LogOut,
   Sparkles,
   ChevronRight,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -116,6 +117,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
               <NavLink to="/admin/analytics" className={navItemClass} onClick={onCloseMobile}>
                 <BarChart3 className="w-4 h-4" />
                 <span>Org Analytics</span>
+              </NavLink>
+              <NavLink to="/admin/workload" className={navItemClass} onClick={onCloseMobile}>
+                <Activity className="w-4 h-4" />
+                <span>Workload</span>
               </NavLink>
               <NavLink to="/admin/settings" className={navItemClass} onClick={onCloseMobile}>
                 <Settings className="w-4 h-4" />
