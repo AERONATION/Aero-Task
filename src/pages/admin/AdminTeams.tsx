@@ -10,6 +10,7 @@ import { TaskModal } from '@/components/tasks/TaskModal';
 import { updateTaskStatus, deleteTask } from '@/services/taskService';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/context/ToastContext';
+import { Avatar } from '@/components/ui/Avatar';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -245,9 +246,7 @@ export const AdminTeams: React.FC = () => {
                   className="p-3 rounded-lg border border-zinc-100 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-800/30 flex items-center justify-between gap-2 group transition-all"
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-semibold text-xs flex items-center justify-center shrink-0">
-                      {m.name.charAt(0)}
-                    </div>
+                    <Avatar src={m.photoURL} name={m.name} size="sm" />
                     <div className="min-w-0">
                       <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate group-hover:text-brand-600 transition-colors">
                         {m.name}

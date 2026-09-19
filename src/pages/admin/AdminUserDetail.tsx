@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { formatDate, formatRelativeDate } from '@/utils/date';
 import { updateTaskStatus, deleteTask, subscribeRecentActivity } from '@/services/taskService';
 import { useToast } from '@/context/ToastContext';
+import { Avatar } from '@/components/ui/Avatar';
 import {
   ArrowLeft,
   User,
@@ -186,9 +187,7 @@ export const AdminUserDetail: React.FC = () => {
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-xs">
         <div className="flex flex-col lg:flex-row items-center lg:items-start justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-            <div className="w-16 h-16 rounded-2xl bg-brand-600 text-white font-bold text-2xl flex items-center justify-center shrink-0">
-              {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
-            </div>
+            <Avatar src={member.photoURL} name={member.name} size="xl" className="w-16 h-16 rounded-2xl text-2xl" />
 
             <div>
               <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">

@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isTeamLead: boolean;
   needsOnboarding: boolean;
   isConfigured: boolean;
   logout: () => Promise<void>;
@@ -31,7 +32,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // If document doesn't exist yet (e.g. initial Google login or direct creation), auto-initialize
       if (!userProf) {
-        // Detect login provider from Firebase user's providerData
         const provider = firebaseUser.providerData?.[0]?.providerId;
         const loginProvider = provider === 'google.com' ? 'google' : 'email';
 
@@ -41,6 +41,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           photoURL: firebaseUser.photoURL || '',
           loginProvider,
         });
+      } else if (firebaseUser.photoURL && userProf.photoURL !== firebaseUser.photoURL) {
+        // Sync Google photo if it changed (runs silently in background)
+        import('@/services/userService').then(({ updateUserProfile }) => {
+          updateUserProfile(firebaseUser.uid, { photoURL: firebaseUser.photoURL || '' }).catch(() => {});
+        });
+        // Optimistically update local state immediately
+        userProf = { ...userProf, photoURL: firebaseUser.photoURL };
       }
 
       setProfile(userProf);
@@ -49,6 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Failed to fetch user profile:', err);
     }
   }, []);
+
 
   const refreshProfile = useCallback(async () => {
     if (user) {
@@ -86,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const isAdmin = profile?.systemRole === 'admin';
+  const isTeamLead = !!(profile?.isTeamLead === true || profile?.systemRole === 'team_lead');
   const needsOnboarding = !!profile && !profile.team;
 
   return (
@@ -96,6 +105,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         isAuthenticated: !!user,
         isAdmin,
+        isTeamLead,
         needsOnboarding,
         isConfigured,
         logout: handleLogout,

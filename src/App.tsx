@@ -6,6 +6,7 @@ import { NotificationProvider } from '@/context/NotificationContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { AdminRoute } from '@/routes/AdminRoute';
+import { TeamLeadRoute } from '@/routes/TeamLeadRoute';
 import { AppLayout } from '@/components/layout/AppLayout';
 
 // Auth pages
@@ -20,6 +21,8 @@ import { MyTasks } from '@/pages/user/MyTasks';
 import { TaskDetail } from '@/pages/user/TaskDetail';
 import { Profile } from '@/pages/user/Profile';
 import { Analytics } from '@/pages/user/Analytics';
+import { MyAttendance } from '@/pages/user/MyAttendance';
+import { MyMeetings } from '@/pages/user/MyMeetings';
 
 // Admin pages
 import { AdminDashboard } from '@/pages/admin/AdminDashboard';
@@ -30,6 +33,16 @@ import { AdminTeams } from '@/pages/admin/AdminTeams';
 import { AdminAnalytics } from '@/pages/admin/AdminAnalytics';
 import { AdminSettings } from '@/pages/admin/AdminSettings';
 import { AdminWorkload } from '@/pages/admin/AdminWorkload';
+import { AdminTeamLeads } from '@/pages/admin/AdminTeamLeads';
+
+// Team Lead pages
+import { TeamLeadDashboard } from '@/pages/teamlead/TeamLeadDashboard';
+import { TeamLeadTasks } from '@/pages/teamlead/TeamLeadTasks';
+import { TeamLeadTeam } from '@/pages/teamlead/TeamLeadTeam';
+import { TeamLeadWorkload } from '@/pages/teamlead/TeamLeadWorkload';
+import { TeamLeadMeetings } from '@/pages/teamlead/TeamLeadMeetings';
+import { TeamLeadAttendance } from '@/pages/teamlead/TeamLeadAttendance';
+import { TeamLeadHierarchy } from '@/pages/teamlead/TeamLeadHierarchy';
 
 const RootRedirect: React.FC = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -75,6 +88,8 @@ export const App: React.FC = () => {
                 <Route path="tasks/:taskId" element={<TaskDetail />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="profile" element={<Profile />} />
+                <Route path="attendance" element={<MyAttendance />} />
+                <Route path="meetings" element={<MyMeetings />} />
               </Route>
 
               {/* Admin Protected Routes */}
@@ -94,7 +109,27 @@ export const App: React.FC = () => {
                 <Route path="teams" element={<AdminTeams />} />
                 <Route path="analytics" element={<AdminAnalytics />} />
                 <Route path="workload" element={<AdminWorkload />} />
+                <Route path="teamleads" element={<AdminTeamLeads />} />
                 <Route path="settings" element={<AdminSettings />} />
+              </Route>
+
+              {/* Team Lead Protected Routes */}
+              <Route
+                path="/teamlead"
+                element={
+                  <TeamLeadRoute>
+                    <AppLayout />
+                  </TeamLeadRoute>
+                }
+              >
+                <Route index element={<Navigate to="/teamlead/dashboard" replace />} />
+                <Route path="dashboard" element={<TeamLeadDashboard />} />
+                <Route path="tasks" element={<TeamLeadTasks />} />
+                <Route path="team" element={<TeamLeadTeam />} />
+                <Route path="workload" element={<TeamLeadWorkload />} />
+                <Route path="meetings" element={<TeamLeadMeetings />} />
+                <Route path="attendance" element={<TeamLeadAttendance />} />
+                <Route path="hierarchy" element={<TeamLeadHierarchy />} />
               </Route>
 
               {/* Root & Catch-All */}

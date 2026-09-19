@@ -6,6 +6,7 @@ import {
   deleteDoc,
   getDocs,
   query,
+  where,
   onSnapshot,
   serverTimestamp,
   orderBy,
@@ -102,6 +103,51 @@ export async function updateUserRole(uid: string, newRole: SystemRole): Promise<
     systemRole: newRole,
     updatedAt: serverTimestamp(),
   });
+}
+
+/**
+ * Admin action: Promote a user to Team Lead (sets isTeamLead = true)
+ * Works additively — admin stays admin, user gets isTeamLead flag
+ */
+export async function promoteToTeamLead(uid: string): Promise<void> {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    isTeamLead: true,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Admin action: Remove Team Lead privileges (sets isTeamLead = false)
+ */
+export async function demoteFromTeamLead(uid: string): Promise<void> {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    isTeamLead: false,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Admin action: Set the manager (reportsTo) for an employee
+ */
+export async function updateUserReportsTo(uid: string, managerUid: string | null): Promise<void> {
+  const userRef = doc(db, 'users', uid);
+  await updateDoc(userRef, {
+    reportsTo: managerUid || null,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Fetch all users who directly report to a given manager
+ */
+export async function getTeamMembersOf(managerUid: string): Promise<UserProfile[]> {
+  const q = query(usersCol, where('reportsTo', '==', managerUid));
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => d.data() as UserProfile)
+    .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 }
 
 /**

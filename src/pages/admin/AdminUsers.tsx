@@ -11,7 +11,8 @@ import { Select } from '@/components/ui/Select';
 import { Button } from '@/components/ui/Button';
 import { TableRowSkeleton } from '@/components/ui/Skeleton';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { updateUserRole, toggleUserActiveStatus, deleteUserProfileDoc } from '@/services/userService';
+import { updateUserRole, toggleUserActiveStatus, deleteUserProfileDoc, promoteToTeamLead, demoteFromTeamLead, updateUserReportsTo } from '@/services/userService';
+import { Avatar } from '@/components/ui/Avatar';
 import { useToast } from '@/context/ToastContext';
 import { Link } from 'react-router-dom';
 import {
@@ -28,6 +29,7 @@ import {
   TrendingUp,
   Trash2,
   Ban,
+  Crown,
 } from 'lucide-react';
 
 export const AdminUsers: React.FC = () => {
@@ -41,7 +43,14 @@ export const AdminUsers: React.FC = () => {
   const [userToBlock, setUserToBlock] = useState<UserProfile | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserProfile | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [leadActionUid, setLeadActionUid] = useState<string | null>(null);
   const { success, error } = useToast();
+
+  // Team leads list for reportsTo dropdown
+  const teamLeads = useMemo(
+    () => users.filter((u) => u.isTeamLead || u.systemRole === 'team_lead'),
+    [users]
+  );
 
   const loading = usersLoading || tasksLoading;
 
@@ -125,6 +134,32 @@ export const AdminUsers: React.FC = () => {
       error(err.message || 'Failed to delete user');
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const handleToggleTeamLead = async (member: UserProfile) => {
+    setLeadActionUid(member.uid);
+    try {
+      if (member.isTeamLead) {
+        await demoteFromTeamLead(member.uid);
+        success(`${member.name} is no longer a Team Lead`);
+      } else {
+        await promoteToTeamLead(member.uid);
+        success(`${member.name} is now a Team Lead`);
+      }
+    } catch (err: any) {
+      error(err.message || 'Failed to update team lead status');
+    } finally {
+      setLeadActionUid(null);
+    }
+  };
+
+  const handleReportsTo = async (employeeUid: string, managerUid: string) => {
+    try {
+      await updateUserReportsTo(employeeUid, managerUid || null);
+      success('Reporting structure updated');
+    } catch (err: any) {
+      error(err.message || 'Failed to update reporting structure');
     }
   };
 
@@ -235,17 +270,20 @@ export const AdminUsers: React.FC = () => {
                         to={`/admin/users/${member.uid}`}
                         className="flex items-center gap-2.5 hover:text-brand-600 transition-colors"
                       >
-                        <div className="w-7 h-7 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-semibold text-xs flex items-center justify-center shrink-0">
-                          {member.name ? member.name.charAt(0).toUpperCase() : 'U'}
-                        </div>
+                        <Avatar src={member.photoURL} name={member.name} size="sm" />
                         <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-semibold text-zinc-900 dark:text-white truncate">
                               {member.name}
                             </span>
                             {member.systemRole === 'admin' && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded bg-brand-50 text-brand-700 dark:bg-brand-950 dark:text-brand-300 font-mono font-medium">
                                 Admin
+                              </span>
+                            )}
+                            {member.isTeamLead && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-mono font-medium flex items-center gap-0.5">
+                                <Crown className="w-2 h-2" /> Lead
                               </span>
                             )}
                           </div>
@@ -322,6 +360,20 @@ export const AdminUsers: React.FC = () => {
                     {/* Actions */}
                     <td className="py-3.5 px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1">
+                        {/* Make / Revoke Team Lead */}
+                        <button
+                          onClick={() => handleToggleTeamLead(member)}
+                          disabled={leadActionUid === member.uid}
+                          className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                            member.isTeamLead
+                              ? 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300 hover:bg-amber-200'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-zinc-200'
+                          } disabled:opacity-50`}
+                          title={member.isTeamLead ? 'Revoke Team Lead' : 'Make Team Lead'}
+                        >
+                          {member.isTeamLead ? '★ Lead' : '+ Lead'}
+                        </button>
+
                         {/* Assign Task */}
                         <button
                           onClick={() => setAssignUserTarget(member)}

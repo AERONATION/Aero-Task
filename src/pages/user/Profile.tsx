@@ -275,9 +275,18 @@ export const Profile: React.FC = () => {
 
           <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-5">
             {/* Avatar */}
-            <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur text-white font-bold text-2xl flex items-center justify-center shadow-lg border-2 border-white/30 shrink-0 select-none">
-              {initials(profile?.name || user?.displayName)}
-            </div>
+            {profile?.photoURL ? (
+              <img
+                src={profile.photoURL}
+                alt={profile.name || 'User'}
+                className="w-20 h-20 rounded-2xl object-cover shadow-lg border-2 border-white/30 shrink-0 select-none"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur text-white font-bold text-2xl flex items-center justify-center shadow-lg border-2 border-white/30 shrink-0 select-none">
+                {initials(profile?.name || user?.displayName)}
+              </div>
+            )}
 
             {/* Info */}
             <div className="flex-1 text-center sm:text-left min-w-0">

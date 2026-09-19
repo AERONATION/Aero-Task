@@ -4,6 +4,7 @@ import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { Button } from '@/components/ui/Button';
 import { TaskModal } from '@/components/tasks/TaskModal';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { Avatar } from '@/components/ui/Avatar';
 import { useAuth } from '@/hooks/useAuth';
 import { useUsers } from '@/hooks/useUsers';
 import { Link } from 'react-router-dom';
@@ -62,9 +63,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileMenu, title }) => 
           className="flex items-center gap-2 p-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           title="View Profile"
         >
-          <div className="w-7 h-7 rounded-full bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-200 flex items-center justify-center text-xs font-semibold">
-            {profile?.name ? profile.name.charAt(0).toUpperCase() : <User className="w-3.5 h-3.5" />}
-          </div>
+          <Avatar src={profile?.photoURL} name={profile?.name} size="sm" />
         </Link>
       </div>
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { Avatar } from '@/components/ui/Avatar';
 import {
   LayoutDashboard,
   CheckSquare,
@@ -15,6 +16,11 @@ import {
   Sparkles,
   ChevronRight,
   Activity,
+  Crown,
+  Calendar,
+  ClipboardCheck,
+  GitBranch,
+  Flame,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -24,7 +30,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
-  const { user, profile, isAdmin, logout } = useAuth();
+  const { user, profile, isAdmin, isTeamLead, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -79,12 +85,64 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
               <BarChart3 className="w-4 h-4" />
               <span>Performance</span>
             </NavLink>
+            <NavLink to="/user/attendance" className={navItemClass} onClick={onCloseMobile}>
+              <ClipboardCheck className="w-4 h-4" />
+              <span>My Attendance</span>
+            </NavLink>
+            <NavLink to="/user/meetings" className={navItemClass} onClick={onCloseMobile}>
+              <Calendar className="w-4 h-4" />
+              <span>My Meetings</span>
+            </NavLink>
             <NavLink to="/user/profile" className={navItemClass} onClick={onCloseMobile}>
               <User className="w-4 h-4" />
               <span>Profile</span>
             </NavLink>
           </nav>
         </div>
+
+        {/* Team Lead Section */}
+        {isTeamLead && (
+          <div>
+            <div className="px-3 mb-1.5 flex items-center justify-between">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                Team Lead
+              </span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300 font-mono font-medium">
+                Lead
+              </span>
+            </div>
+            <nav className="space-y-0.5">
+              <NavLink to="/teamlead/dashboard" className={navItemClass} onClick={onCloseMobile}>
+                <Crown className="w-4 h-4 text-amber-500" />
+                <span>Lead Dashboard</span>
+              </NavLink>
+              <NavLink to="/teamlead/tasks" className={navItemClass} onClick={onCloseMobile}>
+                <CheckSquare className="w-4 h-4" />
+                <span>Assign Tasks</span>
+              </NavLink>
+              <NavLink to="/teamlead/team" className={navItemClass} onClick={onCloseMobile}>
+                <Users className="w-4 h-4" />
+                <span>My Team</span>
+              </NavLink>
+              <NavLink to="/teamlead/workload" className={navItemClass} onClick={onCloseMobile}>
+                <Flame className="w-4 h-4" />
+                <span>Workload</span>
+              </NavLink>
+              <NavLink to="/teamlead/meetings" className={navItemClass} onClick={onCloseMobile}>
+                <Calendar className="w-4 h-4" />
+                <span>Meetings</span>
+              </NavLink>
+              <NavLink to="/teamlead/attendance" className={navItemClass} onClick={onCloseMobile}>
+                <ClipboardCheck className="w-4 h-4" />
+                <span>Attendance</span>
+              </NavLink>
+              <NavLink to="/teamlead/hierarchy" className={navItemClass} onClick={onCloseMobile}>
+                <GitBranch className="w-4 h-4" />
+                <span>Hierarchy Tree</span>
+              </NavLink>
+            </nav>
+          </div>
+        )}
 
         {/* Admin Section */}
         {isAdmin && (
@@ -109,6 +167,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
               <NavLink to="/admin/users" className={navItemClass} onClick={onCloseMobile}>
                 <Users className="w-4 h-4" />
                 <span>Team Members</span>
+              </NavLink>
+              <NavLink to="/admin/teamleads" className={navItemClass} onClick={onCloseMobile}>
+                <Crown className="w-4 h-4" />
+                <span>Team Leads</span>
               </NavLink>
               <NavLink to="/admin/teams" className={navItemClass} onClick={onCloseMobile}>
                 <Layers className="w-4 h-4" />
@@ -135,9 +197,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
       <div className="p-3 border-t border-zinc-100 dark:border-zinc-800">
         <div className="p-2 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-700/60 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-full bg-brand-600 text-white font-medium text-xs flex items-center justify-center shrink-0">
-              {profile?.name ? profile.name.charAt(0).toUpperCase() : 'U'}
-            </div>
+            <Avatar src={profile?.photoURL} name={profile?.name} size="sm" />
             <div className="min-w-0">
               <p className="text-xs font-semibold text-zinc-900 dark:text-white truncate">
                 {profile?.name || user?.email?.split('@')[0]}

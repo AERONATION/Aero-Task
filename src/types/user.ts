@@ -1,6 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 
-export type SystemRole = 'admin' | 'user';
+export type SystemRole = 'admin' | 'team_lead' | 'user';
 
 export type TeamType =
   | 'Backend Engineer'
@@ -63,6 +63,10 @@ export interface UserProfile {
   experienceLevel?: ExperienceLevel;
   department?: string;
   employeeId?: string;
+
+  // Hierarchy
+  reportsTo?: string;         // Manager UID (for reportsTo chain)
+  isTeamLead?: boolean;       // Can be true for both team_lead role AND admin+lead
 
   // Personal Info
   phone?: string;
